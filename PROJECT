@@ -9,7 +9,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: spark-history-operator
-repo: github.com/zncdata-labs/spark-history-operator.git
+repo: github.com/zncdata-labs/spark-history-operator
 resources:
 - api:
     crdVersion: v1
@@ -18,6 +18,6 @@ resources:
   domain: zncdata.net
   group: stack
   kind: SparkHistory
-  path: github.com/zncdata-labs/spark-history-operator.git/api/v1alpha1
+  path: github.com/zncdata-labs/spark-history-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

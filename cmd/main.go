@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	stackv1alpha1 "github.com/zncdata-labs/spark-history-operator.git/api/v1alpha1"
-	"github.com/zncdata-labs/spark-history-operator.git/internal/controller"
+	stackv1alpha1 "github.com/zncdata-labs/spark-history-operator/api/v1alpha1"
+	"github.com/zncdata-labs/spark-history-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 

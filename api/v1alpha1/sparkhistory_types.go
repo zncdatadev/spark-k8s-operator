@@ -17,25 +17,191 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+var (
+	// DefaultImageRepository is the default docker image repository for the operator
+	DefaultImageRepository = "bitnami/spark"
+	// DefaultImageTag is the default docker image tag for the operator
+	DefaultImageTag = "3.4.0"
+	// DefaultImagePullPolicy is the default docker image pull policy for the operator
+	DefaultImagePullPolicy = corev1.PullIfNotPresent
+	// DefaultServiceType is the default service type for the operator
+	DefaultServiceType = corev1.ServiceTypeClusterIP
+	// DefaultSize is the default size for the operator
+	DefaultSize = "10Gi"
+)
 
 // SparkHistorySpec defines the desired state of SparkHistory
 type SparkHistorySpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of SparkHistory. Edit sparkhistory_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +kubebuilder:validation:Optional
+	Image ImageSpec `json:"image"`
+
+	Replicas int32 `json:"replicas"`
+
+	// +kubebuilder:validation:Optional
+	Resource *corev1.ResourceRequirements `json:"resource"`
+
+	// +kubebuilder:validation:Optional
+	SecurityContext *corev1.SecurityContext `json:"securityContext,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	PodSecurityContext *corev1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Service *ServiceSpec `json:"service,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Persistence *PersistenceSpec `json:"persistence,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Ingress *IngressSpec `json:"ingress,omitempty"`
+}
+
+func (sparkHistory *SparkHistory) GetLabels() map[string]string {
+	return map[string]string{
+		"app": sparkHistory.Name,
+	}
+}
+
+type ImageSpec struct {
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=bitnami/spark
+	Repository string `json:"repository"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=latest
+	Tag string `json:"tag"`
+
+	// +kubebuilder:validation:enum=Always;Never;IfNotPresent
+	// +kubebuilder:default=IfNotPresent
+	PullPolicy corev1.PullPolicy `json:"pullPolicy"`
+}
+
+// GetImageTag
+// get image and tag from instance, if is "" use default value then
+// return <ImageRepository>:<ImageTag>
+func (sparkHistory *SparkHistory) GetImageTag() string {
+	image := sparkHistory.Spec.Image.Repository
+	if image == "" {
+		image = DefaultImageRepository
+	}
+	tag := sparkHistory.Spec.Image.Tag
+	if tag == "" {
+		tag = DefaultImageTag
+	}
+	return image + ":" + tag
+}
+
+func (sparkHistory *SparkHistory) GetImagePullPolicy() corev1.PullPolicy {
+	pullPolicy := sparkHistory.Spec.Image.PullPolicy
+	if pullPolicy == "" {
+		pullPolicy = DefaultImagePullPolicy
+	}
+
+	return pullPolicy
+}
+
+func (sparkHistory *SparkHistory) GetNameWithSuffix(suffix string) string {
+	// return sparkHistory.GetName() + rand.String(5) + suffix
+	return sparkHistory.GetName() + suffix
+}
+
+func (sparkHistory *SparkHistory) GetPvcName() string {
+	if sparkHistory.Spec.Persistence.Existing() {
+		return *sparkHistory.Spec.Persistence.ExistingClaim
+	}
+	return sparkHistory.GetNameWithSuffix("-pvc")
+}
+
+// get svc name
+func (sparkHistory *SparkHistory) GetSvcName() string {
+	return sparkHistory.GetNameWithSuffix("-svc")
+}
+
+type ServiceSpec struct {
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
+	// +kubebuilder:default=ClusterIP
+	Type corev1.ServiceType `json:"type"`
+
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=18080
+	Port int32 `json:"port"`
+}
+
+func (sparkHistory *SparkHistory) GetServiceType() corev1.ServiceType {
+	serviceType := sparkHistory.Spec.Service.Type
+	if serviceType == "" {
+		serviceType = DefaultServiceType
+	}
+	return serviceType
+}
+
+type PersistenceSpec struct {
+	// +kubebuilder:validation:Optional
+	StorageClass *string `json:"storageClass,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={ReadWriteOnce}
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
+
+	// +kubebuilder:default="10Gi"
+	Size string `json:"size,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	ExistingClaim *string `json:"existingClaim,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=Filesystem
+	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+func (p *PersistenceSpec) Existing() bool {
+	return p.ExistingClaim != nil
+}
+
+// GetSize
+// get persistence size from instance, if is "" use default value then
+// return <Size>
+func (p *PersistenceSpec) GetSize() resource.Quantity {
+	size := p.Size
+	if size == "" {
+		return resource.MustParse(DefaultSize)
+	}
+	return resource.MustParse(size)
+
+}
+
+type IngressSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=spark-history-server.example.com
+	Host string `json:"host,omitempty"`
 }
 
 // SparkHistoryStatus defines the observed state of SparkHistory
 type SparkHistoryStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Nodes      []string                    `json:"nodes"`
+	Conditions []corev1.ComponentCondition `json:"conditions"`
 }
 
 //+kubebuilder:object:root=true
