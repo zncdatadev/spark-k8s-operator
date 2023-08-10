@@ -74,7 +74,7 @@ func (r *SparkHistoryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		})
 		err := r.Status().Update(ctx, sparkHistory)
 		if err != nil {
-			logger.Error(err, "unable to update SparkHistoryServer status")
+			logger.Error(err, "unable to update SparkHistory status")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
@@ -82,7 +82,7 @@ func (r *SparkHistoryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		sparkHistory.Status.Conditions[0].Status = corev1.ConditionFalse
 		err := r.Status().Update(ctx, sparkHistory)
 		if err != nil {
-			logger.Error(err, "unable to update SparkHistoryServer status")
+			logger.Error(err, "unable to update SparkHistory status")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
@@ -117,12 +117,12 @@ func (r *SparkHistoryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	podNames := getPodNames(podList.Items)
 
 	if !reflect.DeepEqual(podNames, sparkHistory.Status.Nodes) {
-		logger.Info("Updating SparkHistoryServer status", "nodes", podNames)
+		logger.Info("Updating SparkHistory status", "nodes", podNames)
 		sparkHistory.Status.Nodes = podNames
 		sparkHistory.Status.Conditions[0].Status = corev1.ConditionTrue
 		err := r.Status().Update(ctx, sparkHistory)
 		if err != nil {
-			logger.Error(err, "unable to update SparkHistoryServer status")
+			logger.Error(err, "unable to update SparkHistory status")
 			return ctrl.Result{}, err
 		}
 	}

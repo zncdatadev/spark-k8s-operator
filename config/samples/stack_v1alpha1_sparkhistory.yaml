@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/created-by: spark-history-operator
   name: sparkhistory-sample
 spec:
-  replicas: 1
+  replicas: 2
   image:
     repository: bitnami/spark
     tag: latest

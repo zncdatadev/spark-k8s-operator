@@ -1,2 +1,8 @@
 resources:
 - manager.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: controller
+  newName: docker-test.zncdata.net/zncdata-labs/spark-history-operator
+  newTag: latest

@@ -194,7 +194,7 @@ func (p *PersistenceSpec) GetSize() resource.Quantity {
 
 type IngressSpec struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=spark-history-server.example.com
+	// +kubebuilder:default=spark-history.example.com
 	Host string `json:"host,omitempty"`
 }
 
