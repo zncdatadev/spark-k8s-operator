@@ -20,13 +20,13 @@ import (
 	"context"
 	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	corev1 "k8s.io/api/core/v1"
 
 	stackv1alpha1 "github.com/zncdata-labs/spark-history-operator/api/v1alpha1"
 )
@@ -68,24 +68,26 @@ func (r *SparkHistoryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if len(sparkHistory.Status.Conditions) == 0 {
 		sparkHistory.Status.Nodes = []string{}
-		sparkHistory.Status.Conditions = append(sparkHistory.Status.Conditions, corev1.ComponentCondition{
-			Type:   corev1.ComponentHealthy,
-			Status: corev1.ConditionFalse,
+		sparkHistory.Status.Conditions = append(sparkHistory.Status.Conditions, metav1.Condition{
+			Type:               "Ready",
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Now(),
 		})
 		err := r.Status().Update(ctx, sparkHistory)
 		if err != nil {
 			logger.Error(err, "unable to update SparkHistory status")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
-	} else if sparkHistory.Status.Conditions[0].Status == corev1.ConditionTrue {
-		sparkHistory.Status.Conditions[0].Status = corev1.ConditionFalse
+		return ctrl.Result{}, nil
+	} else if sparkHistory.Status.Conditions[0].Status == metav1.ConditionTrue {
+		sparkHistory.Status.Conditions[0].Status = metav1.ConditionFalse
+		sparkHistory.Status.Conditions[0].LastTransitionTime = metav1.Now()
 		err := r.Status().Update(ctx, sparkHistory)
 		if err != nil {
 			logger.Error(err, "unable to update SparkHistory status")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{}, nil
 	}
 
 	if err := r.reconcilePVC(ctx, sparkHistory); err != nil {
@@ -119,12 +121,19 @@ func (r *SparkHistoryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if !reflect.DeepEqual(podNames, sparkHistory.Status.Nodes) {
 		logger.Info("Updating SparkHistory status", "nodes", podNames)
 		sparkHistory.Status.Nodes = podNames
-		sparkHistory.Status.Conditions[0].Status = corev1.ConditionTrue
-		err := r.Status().Update(ctx, sparkHistory)
-		if err != nil {
+		sparkHistory.Status.Conditions[0].Status = metav1.ConditionTrue
+		sparkHistory.Status.Conditions[0].LastTransitionTime = metav1.Now()
+		if err := r.Status().Update(ctx, sparkHistory); err != nil {
 			logger.Error(err, "unable to update SparkHistory status")
 			return ctrl.Result{}, err
 		}
+	}
+
+	sparkHistory.Status.Conditions[0].Status = metav1.ConditionTrue
+	sparkHistory.Status.Conditions[0].LastTransitionTime = metav1.Now()
+	if err := r.Status().Update(ctx, sparkHistory); err != nil {
+		logger.Error(err, "unable to update SparkHistory status")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

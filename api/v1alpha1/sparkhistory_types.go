@@ -200,8 +200,8 @@ type IngressSpec struct {
 
 // SparkHistoryStatus defines the observed state of SparkHistory
 type SparkHistoryStatus struct {
-	Nodes      []string                    `json:"nodes"`
-	Conditions []corev1.ComponentCondition `json:"conditions"`
+	Nodes      []string           `json:"nodes"`
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
 //+kubebuilder:object:root=true

@@ -192,6 +192,12 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistory, s
 							Args: []string{
 								"/opt/bitnami/spark/sbin/start-history-server.sh",
 							},
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    instance.Spec.Resource.Limits["cpu"],
+									corev1.ResourceMemory: instance.Spec.Resource.Limits["memory"],
+								},
+							},
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 18080,
