@@ -1,20 +1,20 @@
-# permissions for end users to view sparkhistories.
+# permissions for end users to view sparkhistoryservers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: sparkhistory-viewer-role
+    app.kubernetes.io/instance: sparkhistoryserver-viewer-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: spark-history-operator
-    app.kubernetes.io/part-of: spark-history-operator
+    app.kubernetes.io/created-by: spark-k8s-operator
+    app.kubernetes.io/part-of: spark-k8s-operator
     app.kubernetes.io/managed-by: kustomize
-  name: sparkhistory-viewer-role
+  name: sparkhistoryserver-viewer-role
 rules:
 - apiGroups:
   - stack.zncdata.net
   resources:
-  - sparkhistories
+  - sparkhistoryservers
   verbs:
   - get
   - list
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - stack.zncdata.net
   resources:
-  - sparkhistories/status
+  - sparkhistoryservers/status
   verbs:
   - get

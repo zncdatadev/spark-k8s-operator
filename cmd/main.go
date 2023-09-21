@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	stackv1alpha1 "github.com/zncdata-labs/spark-history-operator/api/v1alpha1"
-	"github.com/zncdata-labs/spark-history-operator/internal/controller"
+	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdata-labs/spark-k8s-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -67,11 +67,9 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "ab21ba36.zncdata.net",
+		LeaderElectionID:       "b33d8fd0.zncdata.net",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -89,11 +87,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.SparkHistoryReconciler{
+	if err = (&controller.SparkHistoryServerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SparkHistory")
+		setupLog.Error(err, "unable to create controller", "controller", "SparkHistoryServer")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

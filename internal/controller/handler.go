@@ -6,19 +6,19 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	stackv1alpha1 "github.com/zncdata-labs/spark-history-operator/api/v1alpha1"
-
+	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
-func makePVC(ctx context.Context, instance *stackv1alpha1.SparkHistory, schema *runtime.Scheme) *corev1.PersistentVolumeClaim {
+func makePVC(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.PersistentVolumeClaim {
 	logger := log.FromContext(ctx)
 	labels := instance.GetLabels()
 	pvc := &corev1.PersistentVolumeClaim{
@@ -28,11 +28,11 @@ func makePVC(ctx context.Context, instance *stackv1alpha1.SparkHistory, schema *
 			Labels:    labels,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			StorageClassName: instance.Spec.Persistence.StorageClass,
-			AccessModes:      instance.Spec.Persistence.AccessModes,
+			StorageClassName: instance.Spec.Persistence.StorageClassName,
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.PersistentVolumeAccessMode(instance.Spec.Persistence.AccessMode)},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: instance.Spec.Persistence.GetSize(),
+					corev1.ResourceStorage: resource.MustParse(instance.Spec.Persistence.StorageSize),
 				},
 			},
 			VolumeMode: instance.Spec.Persistence.VolumeMode,
@@ -40,14 +40,19 @@ func makePVC(ctx context.Context, instance *stackv1alpha1.SparkHistory, schema *
 	}
 	err := ctrl.SetControllerReference(instance, pvc, schema)
 	if err != nil {
-		logger.Error(err, "Failed to set controller reference")
+		logger.Error(err, "Failed to set controller reference for pvc")
 		return nil
 	}
 	return pvc
 }
 
-func (r *SparkHistoryReconciler) reconcilePVC(ctx context.Context, instance *stackv1alpha1.SparkHistory) error {
+func (r *SparkHistoryServerReconciler) reconcilePVC(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
 	logger := log.FromContext(ctx)
+
+	if instance.Spec.Persistence.Enable == false {
+		return nil
+	}
+
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: instance.GetPvcName()}, pvc)
 	if err != nil && errors.IsNotFound(err) {
@@ -64,9 +69,44 @@ func (r *SparkHistoryReconciler) reconcilePVC(ctx context.Context, instance *sta
 	return nil
 }
 
-func makeIngress(ctx context.Context, instance *stackv1alpha1.SparkHistory, schema *runtime.Scheme) *v1.Ingress {
+func ingressPathsBuilder(instance *stackv1alpha1.SparkHistoryServer, paths []*stackv1alpha1.IngressHostPathsSpec) []v1.HTTPIngressPath {
+	var ingressPaths []v1.HTTPIngressPath
+	for _, path := range paths {
+		ingressPaths = append(ingressPaths, v1.HTTPIngressPath{
+			Path:     path.Path,
+			PathType: path.PathType,
+			Backend: v1.IngressBackend{
+				Service: &v1.IngressServiceBackend{
+					Name: instance.GetName(),
+					Port: v1.ServiceBackendPort{
+						Number: instance.Spec.Service.Port,
+					},
+				},
+			},
+		})
+	}
+	return ingressPaths
+}
+
+func ingressRulesBuilder(instance *stackv1alpha1.SparkHistoryServer) []v1.IngressRule {
+	var ingressRules []v1.IngressRule
+	for _, rule := range instance.Spec.Ingress.Hosts {
+		ingressRules = append(ingressRules, v1.IngressRule{
+			Host: rule.Host,
+			IngressRuleValue: v1.IngressRuleValue{
+				HTTP: &v1.HTTPIngressRuleValue{
+					Paths: ingressPathsBuilder(instance, rule.Paths),
+				},
+			},
+		})
+	}
+	return ingressRules
+}
+
+func makeIngress(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *v1.Ingress {
 	logger := log.FromContext(ctx)
 	labels := instance.GetLabels()
+
 	ing := &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
@@ -74,43 +114,18 @@ func makeIngress(ctx context.Context, instance *stackv1alpha1.SparkHistory, sche
 			Labels:    labels,
 		},
 		Spec: v1.IngressSpec{
-			Rules: []v1.IngressRule{
-				{
-					Host: instance.Spec.Ingress.Host,
-					IngressRuleValue: v1.IngressRuleValue{
-						HTTP: &v1.HTTPIngressRuleValue{
-							Paths: []v1.HTTPIngressPath{
-								{
-									Path: "/",
-									PathType: func() *v1.PathType {
-										pt := v1.PathTypePrefix
-										return &pt
-									}(),
-									Backend: v1.IngressBackend{
-										Service: &v1.IngressServiceBackend{
-											Name: instance.Name,
-											Port: v1.ServiceBackendPort{
-												Number: instance.Spec.Service.Port,
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			Rules: ingressRulesBuilder(instance),
 		},
 	}
 	err := ctrl.SetControllerReference(instance, ing, schema)
 	if err != nil {
-		logger.Error(err, "Failed to set controller reference")
+		logger.Error(err, "Failed to set controller reference for ingress")
 		return nil
 	}
 	return ing
 }
 
-func (r *SparkHistoryReconciler) reconcileIngress(ctx context.Context, instance *stackv1alpha1.SparkHistory) error {
+func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
 	logger := log.FromContext(ctx)
 	obj := makeIngress(ctx, instance, r.Scheme)
 	if obj == nil {
@@ -124,7 +139,8 @@ func (r *SparkHistoryReconciler) reconcileIngress(ctx context.Context, instance 
 	return nil
 }
 
-func makeService(ctx context.Context, instance *stackv1alpha1.SparkHistory, schema *runtime.Scheme) *corev1.Service {
+func makeService(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.Service {
+	logger := log.FromContext(ctx)
 	labels := instance.GetLabels()
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -142,17 +158,18 @@ func makeService(ctx context.Context, instance *stackv1alpha1.SparkHistory, sche
 				},
 			},
 			Selector: labels,
-			Type:     instance.GetServiceType(),
+			Type:     instance.Spec.Service.Type,
 		},
 	}
 	err := ctrl.SetControllerReference(instance, svc, schema)
 	if err != nil {
+		logger.Error(err, "Failed to set controller reference for service")
 		return nil
 	}
 	return svc
 }
 
-func (r *SparkHistoryReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.SparkHistory) error {
+func (r *SparkHistoryServerReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
 	logger := log.FromContext(ctx)
 	obj := makeService(ctx, instance, r.Scheme)
 	if obj == nil {
@@ -166,8 +183,10 @@ func (r *SparkHistoryReconciler) reconcileService(ctx context.Context, instance 
 	return nil
 }
 
-func makeDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistory, schema *runtime.Scheme) *appsv1.Deployment {
+func makeDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *appsv1.Deployment {
+	logger := log.FromContext(ctx)
 	labels := instance.GetLabels()
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
@@ -184,20 +203,16 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistory, s
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: instance.Spec.SecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            instance.Name,
-							Image:           instance.GetImageTag(),
-							ImagePullPolicy: instance.GetImagePullPolicy(),
+							Image:           instance.Spec.Image.Repository + ":" + instance.Spec.Image.Tag,
+							ImagePullPolicy: instance.Spec.Image.PullPolicy,
 							Args: []string{
 								"/opt/bitnami/spark/sbin/start-history-server.sh",
 							},
-							Resources: corev1.ResourceRequirements{
-								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    instance.Spec.Resource.Limits["cpu"],
-									corev1.ResourceMemory: instance.Spec.Resource.Limits["memory"],
-								},
-							},
+							Resources: *instance.Spec.Resources,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 18080,
@@ -213,29 +228,38 @@ func makeDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistory, s
 							},
 						},
 					},
-					Tolerations: instance.Spec.Tolerations,
-					Volumes: []corev1.Volume{
-						{
-							Name: instance.GetNameWithSuffix("-data"),
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: instance.GetPvcName(),
-								},
-							},
-						},
-					},
 				},
 			},
 		},
 	}
+
+	if instance.Spec.Persistence.Enable == true {
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: instance.GetNameWithSuffix("-data"),
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: instance.GetPvcName(),
+				},
+			},
+		})
+	} else {
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: instance.GetNameWithSuffix("-data"),
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	}
+
 	err := ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
+		logger.Error(err, "Failed to set controller reference for deployment")
 		return nil
 	}
 	return dep
 }
 
-func (r *SparkHistoryReconciler) reconcileDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistory) error {
+func (r *SparkHistoryServerReconciler) reconcileDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
 	logger := log.FromContext(ctx)
 	obj := makeDeployment(ctx, instance, r.Scheme)
 	if obj == nil {

@@ -30,7 +30,7 @@ RETISTRY ?= quay.io/zncdata
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# zncdata.net/spark-history-operator-bundle:$VERSION and zncdata.net/spark-history-operator-catalog:$VERSION.
+# zncdata.net/spark-k8s-operator-bundle:$VERSION and zncdata.net/spark-k8s-operator-catalog:$VERSION.
 IMAGE_TAG_BASE ?= $(RETISTRY)/spark-k8s-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
@@ -53,7 +53,7 @@ endif
 OPERATOR_SDK_VERSION ?= v1.31.0
 
 # Image URL to use all building/pushing image targets
-IMG ?= $(IMAGE_TAG_BASE):latest
+IMG ?= $(RETISTRY)/spark-k8s-operator:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.26.0
 
@@ -138,7 +138,6 @@ docker-push: ## Push docker image with the manager.
 # - have enable BuildKit, More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 # - be able to push the image for your registry (i.e. if you do not inform a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
 # To properly provided solutions that supports more than one platform you should use this option.
-# PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 PLATFORMS ?= linux/arm64,linux/amd64
 .PHONY: docker-buildx
 docker-buildx: test ## Build and push docker image for the manager for cross-platform support
@@ -187,7 +186,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.1.1
-CONTROLLER_TOOLS_VERSION ?= v0.11.1
+CONTROLLER_TOOLS_VERSION ?= v0.13.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -240,25 +239,17 @@ bundle-build: ## Build the bundle image.
 
 .PHONY: bundle-buildx
 bundle-buildx: ## Build the bundle image.
-	docker buildx create --name project-v3-builder --use
-	docker buildx build --push --platform=$(PLATFORMS) -f bundle.Dockerfile -t $(BUNDLE_IMG) .
-	docker buildx rm project-v3-builder
+	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
+	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' bundle.Dockerfile > bundle.Dockerfile.cross
+	- docker buildx create --name project-v3-builder
+	docker buildx use project-v3-builder
+	- docker buildx build --push --platform=$(PLATFORMS) --tag ${BUNDLE_IMG} -f bundle.Dockerfile.cross .
+	- docker buildx rm project-v3-builder
+	rm bundle.Dockerfile.cross
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
-
-.PHONY: bundle-validate
-bundle-validate: ## Validate the bundle image.
-	$(OPERATOR_SDK) bundle validate $(BUNDLE_IMG)
-
-.PHONY: bundle-run
-bundle-run: ## Run the bundle image.
-	$(OPERATOR_SDK) run bundle $(BUNDLE_IMG)
-
-.PHONY: cleanup
-cleanup: ## Cleanup the bundle image.
-	$(OPERATOR_SDK) cleanup spark-history-operator
 
 .PHONY: opm
 OPM = ./bin/opm

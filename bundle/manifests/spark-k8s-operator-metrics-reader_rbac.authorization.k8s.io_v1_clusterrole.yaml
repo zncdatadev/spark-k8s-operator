@@ -4,12 +4,12 @@ metadata:
   creationTimestamp: null
   labels:
     app.kubernetes.io/component: kube-rbac-proxy
-    app.kubernetes.io/created-by: spark-history-operator
+    app.kubernetes.io/created-by: spark-k8s-operator
     app.kubernetes.io/instance: metrics-reader
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/part-of: spark-history-operator
-  name: spark-history-operator-metrics-reader
+    app.kubernetes.io/part-of: spark-k8s-operator
+  name: spark-k8s-operator-metrics-reader
 rules:
 - nonResourceURLs:
   - /metrics

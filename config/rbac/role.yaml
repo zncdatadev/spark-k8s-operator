@@ -2,7 +2,6 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
@@ -75,7 +74,7 @@ rules:
 - apiGroups:
   - stack.zncdata.net
   resources:
-  - sparkhistories
+  - sparkhistoryservers
   verbs:
   - create
   - delete
@@ -87,13 +86,13 @@ rules:
 - apiGroups:
   - stack.zncdata.net
   resources:
-  - sparkhistories/finalizers
+  - sparkhistoryservers/finalizers
   verbs:
   - update
 - apiGroups:
   - stack.zncdata.net
   resources:
-  - sparkhistories/status
+  - sparkhistoryservers/status
   verbs:
   - get
   - patch
