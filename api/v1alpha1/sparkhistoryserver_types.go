@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -146,6 +147,46 @@ type ServiceSpec struct {
 	// +kubebuilder:validation:Maximum=65535
 	// +kubebuilder:default=18080
 	Port int32 `json:"port"`
+}
+
+// SetStatusCondition updates the status condition using the provided arguments.
+// If the condition already exists, it updates the condition; otherwise, it appends the condition.
+// If the condition status has changed, it updates the condition's LastTransitionTime.
+func (sparkHistory *SparkHistoryServer) SetStatusCondition(condition metav1.Condition) {
+	// if the condition already exists, update it
+	existingCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, condition.Type)
+	if existingCondition == nil {
+		condition.ObservedGeneration = sparkHistory.GetGeneration()
+		condition.LastTransitionTime = metav1.Now()
+		sparkHistory.Status.Conditions = append(sparkHistory.Status.Conditions, condition)
+	} else if existingCondition.Status != condition.Status || existingCondition.Reason != condition.Reason || existingCondition.Message != condition.Message {
+		existingCondition.Status = condition.Status
+		existingCondition.Reason = condition.Reason
+		existingCondition.Message = condition.Message
+		existingCondition.ObservedGeneration = sparkHistory.GetGeneration()
+		existingCondition.LastTransitionTime = metav1.Now()
+	}
+}
+
+// InitStatusConditions initializes the status conditions to the provided conditions.
+func (sparkHistory *SparkHistoryServer) InitStatusConditions() {
+	sparkHistory.Status.Conditions = []metav1.Condition{}
+	sparkHistory.SetStatusCondition(metav1.Condition{
+		Type:               ConditionTypeProgressing,
+		Status:             metav1.ConditionTrue,
+		Reason:             ConditionReasonPreparing,
+		Message:            "SparkHistoryServer is preparing",
+		ObservedGeneration: sparkHistory.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	})
+	sparkHistory.SetStatusCondition(metav1.Condition{
+		Type:               ConditionTypeAvailable,
+		Status:             metav1.ConditionFalse,
+		Reason:             ConditionReasonPreparing,
+		Message:            "SparkHistoryServer is preparing",
+		ObservedGeneration: sparkHistory.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	})
 }
 
 // SparkHistoryServerStatus defines the observed state of SparkHistoryServer

@@ -37,8 +37,9 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme       = runtime.NewScheme()
+	setupLog     = ctrl.Log.WithName("setup")
+	reconcileLog = ctrl.Log.WithName("reconciling")
 )
 
 func init() {
@@ -90,6 +91,7 @@ func main() {
 	if err = (&controller.SparkHistoryServerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Log:    reconcileLog,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SparkHistoryServer")
 		os.Exit(1)
