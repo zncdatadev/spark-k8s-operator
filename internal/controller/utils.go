@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/cisco-open/k8s-objectmatcher/patch"
 	corev1 "k8s.io/api/core/v1"
@@ -10,11 +11,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+var (
+	logger = ctrl.Log.WithName("utils")
 )
 
 func CreateOrUpdate(ctx context.Context, c client.Client, obj client.Object) error {
-	logger := log.FromContext(ctx)
 	key := client.ObjectKeyFromObject(obj)
 	namespace := obj.GetNamespace()
 

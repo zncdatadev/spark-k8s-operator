@@ -38,7 +38,7 @@ spec:
   - k8s
   links:
   - name: Spark K8s Operator
-    url: https://spark-k8s-operator.domain
+    url: https://github.com/zncdata-labs/spark-k8s-operator
   maintainers:
   - email: huagang.wang@zncdata.com
     name: wanghuagang
