@@ -30,7 +30,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - run: |
-          export VERSION=0.0.1-alpha
           make docker-build
  
   linting:
@@ -76,7 +75,6 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          export VERSION=0.0.1-alpha
           make docker-buildx
           make bundle
           make bundle-buildx
