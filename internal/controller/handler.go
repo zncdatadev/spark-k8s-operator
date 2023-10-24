@@ -2,8 +2,10 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -11,8 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.PersistentVolumeClaim {
@@ -63,42 +63,10 @@ func (r *SparkHistoryServerReconciler) reconcilePVC(ctx context.Context, instanc
 	return nil
 }
 
-func ingressPathsBuilder(instance *stackv1alpha1.SparkHistoryServer, paths []*stackv1alpha1.IngressHostPathsSpec) []v1.HTTPIngressPath {
-	var ingressPaths []v1.HTTPIngressPath
-	for _, path := range paths {
-		ingressPaths = append(ingressPaths, v1.HTTPIngressPath{
-			Path:     path.Path,
-			PathType: path.PathType,
-			Backend: v1.IngressBackend{
-				Service: &v1.IngressServiceBackend{
-					Name: instance.GetName(),
-					Port: v1.ServiceBackendPort{
-						Number: instance.Spec.Service.Port,
-					},
-				},
-			},
-		})
-	}
-	return ingressPaths
-}
-
-func ingressRulesBuilder(instance *stackv1alpha1.SparkHistoryServer) []v1.IngressRule {
-	var ingressRules []v1.IngressRule
-	for _, rule := range instance.Spec.Ingress.Hosts {
-		ingressRules = append(ingressRules, v1.IngressRule{
-			Host: rule.Host,
-			IngressRuleValue: v1.IngressRuleValue{
-				HTTP: &v1.HTTPIngressRuleValue{
-					Paths: ingressPathsBuilder(instance, rule.Paths),
-				},
-			},
-		})
-	}
-	return ingressRules
-}
-
 func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *v1.Ingress {
 	labels := instance.GetLabels()
+
+	pt := v1.PathTypeImplementationSpecific
 
 	ing := &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -107,7 +75,29 @@ func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.Spark
 			Labels:    labels,
 		},
 		Spec: v1.IngressSpec{
-			Rules: ingressRulesBuilder(instance),
+			Rules: []v1.IngressRule{
+				{
+					Host: instance.Spec.Ingress.Host,
+					IngressRuleValue: v1.IngressRuleValue{
+						HTTP: &v1.HTTPIngressRuleValue{
+							Paths: []v1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pt,
+									Backend: v1.IngressBackend{
+										Service: &v1.IngressServiceBackend{
+											Name: instance.GetName(),
+											Port: v1.ServiceBackendPort{
+												Number: instance.Spec.Service.Port,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 	err := ctrl.SetControllerReference(instance, ing, schema)
@@ -128,6 +118,29 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 		r.Log.Error(err, "Failed to create or update ingress")
 		return err
 	}
+
+	if instance.Spec.Ingress.Enabled {
+		url := fmt.Sprintf("http://%s", instance.Spec.Ingress.Host)
+		if instance.Status.URLs == nil {
+			instance.Status.URLs = []stackv1alpha1.StatusURL{
+				{
+					Name: "webui",
+					URL:  url,
+				},
+			}
+			if err := r.UpdateStatus(ctx, instance); err != nil {
+				return err
+			}
+
+		} else if instance.Spec.Ingress.Host != instance.Status.URLs[0].Name {
+			instance.Status.URLs[0].URL = url
+			if err := r.UpdateStatus(ctx, instance); err != nil {
+				return err
+			}
+
+		}
+	}
+
 	return nil
 }
 

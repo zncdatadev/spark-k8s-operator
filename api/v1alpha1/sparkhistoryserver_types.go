@@ -116,25 +116,10 @@ type IngressSpec struct {
 	// +kubebuilder:validation:Optional
 	TLS *networkingv1.IngressTLS `json:"tls,omitempty"`
 	// +kubebuilder:validation:Optional
-	Annotations map[string]string   `json:"annotations,omitempty"`
-	Hosts       []*IngressHostsSpec `json:"hosts"`
-}
-
-type IngressHostsSpec struct {
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="spark-history-server.example.coom"
+	// +kubebuilder:default:="spark-history-server.example.com"
 	Host string `json:"host,omitempty"`
-	// +kubebuilder:validation:Required
-	Paths []*IngressHostPathsSpec `json:"paths"`
-}
-
-type IngressHostPathsSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="/"
-	Path string `json:"path,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=ImplementationSpecific
-	PathType *networkingv1.PathType `json:"pathType,omitempty"`
 }
 
 type ServiceSpec struct {
@@ -193,6 +178,13 @@ func (sparkHistory *SparkHistoryServer) InitStatusConditions() {
 type SparkHistoryServerStatus struct {
 	// +kubebuilder:validation:Optional
 	Conditions []metav1.Condition `json:"condition,omitempty"`
+	// +kubebuilder:validation:Optional
+	URLs []StatusURL `json:"urls,omitempty"`
+}
+
+type StatusURL struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 //+kubebuilder:object:root=true
