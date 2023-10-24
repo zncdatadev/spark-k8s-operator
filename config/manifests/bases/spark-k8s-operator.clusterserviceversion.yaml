@@ -25,24 +25,29 @@ spec:
       deployments: null
     strategy: ""
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
-  - supported: true
+  - supported: false
     type: AllNamespaces
   keywords:
   - spark
   - k8s
   links:
-  - name: Spark K8s Operator
+  - name: Spark Website
+    url: https://spark.apache.org/
+  - name: Repository
     url: https://github.com/zncdata-labs/spark-k8s-operator
+  - name: icon
+    url: https://spark.apache.org/favicon.ico
   maintainers:
   - email: huagang.wang@zncdata.com
     name: wanghuagang
   maturity: alpha
   provider:
     name: zncdata-labs
+    url: https://github.com/zncdata-labs
   version: 0.0.0
