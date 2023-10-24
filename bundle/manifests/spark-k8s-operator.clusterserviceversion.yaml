@@ -66,8 +66,8 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-10-23T07:59:35Z"
-    operators.operatorframework.io/builder: operator-sdk-v1.31.0
+    createdAt: "2023-10-24T01:44:48Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4-alpha
   name: spark-k8s-operator.v0.0.1-alpha
   namespace: placeholder
@@ -330,24 +330,29 @@ spec:
         serviceAccountName: spark-k8s-operator-controller-manager
     strategy: deployment
   installModes:
-  - supported: false
+  - supported: true
     type: OwnNamespace
-  - supported: false
+  - supported: true
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
-  - supported: true
+  - supported: false
     type: AllNamespaces
   keywords:
   - spark
   - k8s
   links:
-  - name: Spark K8s Operator
+  - name: Spark Website
+    url: https://spark.apache.org/
+  - name: Repository
     url: https://github.com/zncdata-labs/spark-k8s-operator
+  - name: icon
+    url: https://spark.apache.org/favicon.ico
   maintainers:
   - email: huagang.wang@zncdata.com
     name: wanghuagang
   maturity: alpha
   provider:
     name: zncdata-labs
+    url: https://github.com/zncdata-labs
   version: 0.0.1-alpha
