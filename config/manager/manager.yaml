@@ -19,7 +19,7 @@ metadata:
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: spark-k8s-operator
-    app.kubernetes.io/instance: controller-manager
+    app.kubernetes.io/instance: spark-k8s-operator-
     app.kubernetes.io/component: manager
     app.kubernetes.io/created-by: operator-lifecycle-manager
     app.kubernetes.io/part-of: spark-k8s-operator
@@ -36,7 +36,7 @@ spec:
       labels:
         control-plane: controller-manager
         app.kubernetes.io/name: spark-k8s-operator
-        app.kubernetes.io/instance: controller-manager
+        app.kubernetes.io/instance: spark-k8s-operator-
         app.kubernetes.io/component: manager
         app.kubernetes.io/created-by: operator-lifecycle-manager
         app.kubernetes.io/part-of: spark-k8s-operator

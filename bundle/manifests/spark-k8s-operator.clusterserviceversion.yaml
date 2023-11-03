@@ -10,10 +10,10 @@ metadata:
           "metadata": {
             "labels": {
               "app.kubernetes.io/created-by": "spark-k8s-operator",
-              "app.kubernetes.io/instance": "sparkhistoryserver-sample",
+              "app.kubernetes.io/instance": "sparkhistoryserver-",
               "app.kubernetes.io/managed-by": "kustomize",
               "app.kubernetes.io/name": "sparkhistoryserver",
-              "app.kubernetes.io/part-of": "spark-k8s-operator"
+              "app.kubernetes.io/part-of": "spark-k8s"
             },
             "name": "sparkhistoryserver-sample"
           },
@@ -56,7 +56,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2023-11-03T07:01:15Z"
+    createdAt: "2023-11-03T07:25:13Z"
     operators.operatorframework.io/builder: operator-sdk-v1.32.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4-alpha
   name: spark-k8s-operator.v0.0.1-alpha
@@ -189,7 +189,7 @@ spec:
       - label:
           app.kubernetes.io/component: manager
           app.kubernetes.io/created-by: operator-lifecycle-manager
-          app.kubernetes.io/instance: controller-manager
+          app.kubernetes.io/instance: spark-k8s-operator-
           app.kubernetes.io/managed-by: kustomize
           app.kubernetes.io/name: spark-k8s-operator
           app.kubernetes.io/part-of: spark-k8s-operator
@@ -208,7 +208,7 @@ spec:
               labels:
                 app.kubernetes.io/component: manager
                 app.kubernetes.io/created-by: operator-lifecycle-manager
-                app.kubernetes.io/instance: controller-manager
+                app.kubernetes.io/instance: spark-k8s-operator-
                 app.kubernetes.io/managed-by: kustomize
                 app.kubernetes.io/name: spark-k8s-operator
                 app.kubernetes.io/part-of: spark-k8s-operator
