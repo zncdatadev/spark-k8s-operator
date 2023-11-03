@@ -62,29 +62,9 @@ spec:
                   enabled:
                     default: true
                     type: boolean
-                  hosts:
-                    items:
-                      properties:
-                        host:
-                          default: spark-history-server.example.coom
-                          type: string
-                        paths:
-                          items:
-                            properties:
-                              path:
-                                default: /
-                                type: string
-                              pathType:
-                                default: ImplementationSpecific
-                                description: PathType represents the type of path
-                                  referred to by a HTTPIngressPath.
-                                type: string
-                            type: object
-                          type: array
-                      required:
-                      - paths
-                      type: object
-                    type: array
+                  host:
+                    default: spark-history-server.example.com
+                    type: string
                   tls:
                     description: IngressTLS describes the transport layer security
                       associated with an ingress.
@@ -108,8 +88,6 @@ spec:
                           and value of the "Host" header is used for routing.
                         type: string
                     type: object
-                required:
-                - hosts
                 type: object
               labels:
                 additionalProperties:
@@ -460,6 +438,18 @@ spec:
                   - reason
                   - status
                   - type
+                  type: object
+                type: array
+              urls:
+                items:
+                  properties:
+                    name:
+                      type: string
+                    url:
+                      type: string
+                  required:
+                  - name
+                  - url
                   type: object
                 type: array
             type: object
