@@ -3,7 +3,7 @@ kind: SparkHistoryServer
 metadata:
   labels:
     app.kubernetes.io/name: sparkhistoryserver
-    app.kubernetes.io/instance: sparkhistoryserver-
+    app.kubernetes.io/instance: sparkhistoryserver
     app.kubernetes.io/part-of: spark-k8s
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: spark-k8s-operator
