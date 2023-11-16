@@ -4,6 +4,9 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
+    categories: Compute
+    datasuit: Develop, Analysis
+    icon: https://spark.apache.org/favicon.ico
   name: spark-k8s-operator.v0.0.0
   namespace: placeholder
 spec:
