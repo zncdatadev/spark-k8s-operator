@@ -57,6 +57,15 @@ type SparkHistoryServerSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Annotations map[string]string `json:"annotations"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations *corev1.Toleration `json:"tolerations"`
+
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity"`
 }
 
 func (sparkHistory *SparkHistoryServer) GetNameWithSuffix(suffix string) string {

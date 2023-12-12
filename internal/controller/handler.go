@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -234,6 +235,8 @@ func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.Sp
 			},
 		},
 	}
+
+	SparkHistoryServerScheduler(instance, dep)
 
 	if instance.Spec.Persistence.Enable == true {
 		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
