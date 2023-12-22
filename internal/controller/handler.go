@@ -3,6 +3,9 @@ package controller
 import (
 	"context"
 	"fmt"
+	zncdataerr "github.com/zncdata-labs/operator-go/pkg/errors"
+	"github.com/zncdata-labs/operator-go/pkg/status"
+	"github.com/zncdata-labs/operator-go/pkg/utils"
 
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -16,7 +19,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.PersistentVolumeClaim {
+func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*corev1.PersistentVolumeClaim, error) {
 	labels := instance.GetLabels()
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -27,7 +30,7 @@ func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHist
 		Spec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: instance.Spec.Persistence.StorageClassName,
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.PersistentVolumeAccessMode(instance.Spec.Persistence.AccessMode)},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(instance.Spec.Persistence.StorageSize),
 				},
@@ -38,9 +41,9 @@ func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHist
 	err := ctrl.SetControllerReference(instance, pvc, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for pvc")
-		return nil
+		return nil, zncdataerr.Wrap(err, "Failed to set controller reference for pvc")
 	}
-	return pvc
+	return pvc, nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcilePVC(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
@@ -51,9 +54,12 @@ func (r *SparkHistoryServerReconciler) reconcilePVC(ctx context.Context, instanc
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: instance.GetPvcName()}, pvc)
 	if err != nil && errors.IsNotFound(err) {
-		pvc := r.makePVC(instance, r.Scheme)
+		pvc, err := r.makePVC(instance, r.Scheme)
+		if err != nil {
+			return err
+		}
 		r.Log.Info("Creating a new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
-		err := r.Client.Create(ctx, pvc)
+		err = r.Client.Create(ctx, pvc)
 		if err != nil {
 			return err
 		}
@@ -64,11 +70,9 @@ func (r *SparkHistoryServerReconciler) reconcilePVC(ctx context.Context, instanc
 	return nil
 }
 
-func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *v1.Ingress {
+func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*v1.Ingress, error) {
 	labels := instance.GetLabels()
-
 	pt := v1.PathTypeImplementationSpecific
-
 	ing := &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name,
@@ -103,16 +107,15 @@ func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.Spark
 	}
 	err := ctrl.SetControllerReference(instance, ing, schema)
 	if err != nil {
-		r.Log.Error(err, "Failed to set controller reference for ingress")
-		return nil
+		return nil, zncdataerr.Wrap(err, "Failed to set controller reference for ingress")
 	}
-	return ing
+	return ing, nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	obj := r.makeIngress(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeIngress(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
@@ -123,19 +126,19 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 	if instance.Spec.Ingress.Enabled {
 		url := fmt.Sprintf("http://%s", instance.Spec.Ingress.Host)
 		if instance.Status.URLs == nil {
-			instance.Status.URLs = []stackv1alpha1.StatusURL{
+			instance.Status.URLs = []status.URL{
 				{
 					Name: "webui",
 					URL:  url,
 				},
 			}
-			if err := r.UpdateStatus(ctx, instance); err != nil {
+			if err := utils.UpdateStatus(ctx, r.Client, instance); err != nil {
 				return err
 			}
 
 		} else if instance.Spec.Ingress.Host != instance.Status.URLs[0].Name {
 			instance.Status.URLs[0].URL = url
-			if err := r.UpdateStatus(ctx, instance); err != nil {
+			if err := utils.UpdateStatus(ctx, r.Client, instance); err != nil {
 				return err
 			}
 
@@ -145,7 +148,7 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 	return nil
 }
 
-func (r *SparkHistoryServerReconciler) makeService(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.Service {
+func (r *SparkHistoryServerReconciler) makeService(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*corev1.Service, error) {
 	labels := instance.GetLabels()
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -168,16 +171,15 @@ func (r *SparkHistoryServerReconciler) makeService(instance *stackv1alpha1.Spark
 	}
 	err := ctrl.SetControllerReference(instance, svc, schema)
 	if err != nil {
-		r.Log.Error(err, "Failed to set controller reference for service")
-		return nil
+		return nil, zncdataerr.Wrap(err, "Failed to set controller reference for service")
 	}
-	return svc
+	return svc, nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	obj := r.makeService(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeService(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
@@ -187,7 +189,7 @@ func (r *SparkHistoryServerReconciler) reconcileService(ctx context.Context, ins
 	return nil
 }
 
-func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *appsv1.Deployment {
+func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*appsv1.Deployment, error) {
 	labels := instance.GetLabels()
 
 	dep := &appsv1.Deployment{
@@ -258,10 +260,9 @@ func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.Sp
 
 	err := ctrl.SetControllerReference(instance, dep, schema)
 	if err != nil {
-		r.Log.Error(err, "Failed to set controller reference for deployment")
-		return nil
+		return nil, zncdataerr.Wrap(err, "Failed to set controller reference for deployment")
 	}
-	return dep
+	return dep, nil
 }
 
 func (r *SparkHistoryServerReconciler) updateStatusConditionWithDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer, status metav1.ConditionStatus, message string) error {
@@ -274,16 +275,16 @@ func (r *SparkHistoryServerReconciler) updateStatusConditionWithDeployment(ctx c
 		LastTransitionTime: metav1.Now(),
 	})
 
-	if err := r.UpdateStatus(ctx, instance); err != nil {
+	if err := utils.UpdateStatus(ctx, r.Client, instance); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcileDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	obj := r.makeDeployment(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeDeployment(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
 		logger.Error(err, "Failed to create or update deployment")

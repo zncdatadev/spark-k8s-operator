@@ -19,11 +19,11 @@ package controller
 import (
 	"context"
 	"github.com/go-logr/logr"
+	"github.com/zncdata-labs/operator-go/pkg/utils"
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -75,7 +75,8 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if readCondition == nil || readCondition.ObservedGeneration != sparkHistory.GetGeneration() {
 		sparkHistory.InitStatusConditions()
 
-		if err := r.UpdateStatus(ctx, sparkHistory); err != nil {
+		if err := utils.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
+			r.Log.Error(err, "unable to update SparkHistoryServer status")
 			return ctrl.Result{}, err
 		}
 	}
@@ -110,38 +111,13 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		ObservedGeneration: sparkHistory.GetGeneration(),
 	})
 
-	if err := r.UpdateStatus(ctx, sparkHistory); err != nil {
+	if err := utils.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
+		r.Log.Error(err, "unable to update SparkHistoryServer status")
 		return ctrl.Result{}, err
 	}
 
 	r.Log.Info("Successfully reconciled SparkHistoryServer")
 	return ctrl.Result{}, nil
-}
-
-// UpdateStatus updates the status of the SparkHistoryServer resource
-// https://stackoverflow.com/questions/76388004/k8s-controller-update-status-and-condition
-func (r *SparkHistoryServerReconciler) UpdateStatus(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return r.Status().Update(ctx, instance)
-		//return r.Status().Patch(ctx, instance, client.MergeFrom(instance))
-	})
-
-	if retryErr != nil {
-		r.Log.Error(retryErr, "Failed to update vfm status after retries")
-		return retryErr
-	}
-
-	//if err := r.Get(ctx, key, latest); err != nil {
-	//	r.Log.Error(err, "Failed to get latest object")
-	//	return err
-	//}
-	//
-	//if err := r.Status().Patch(ctx, instance, client.MergeFrom(instance)); err != nil {
-	//	r.Log.Error(err, "Failed to patch object status")
-	//	return err
-	//}
-	r.Log.V(1).Info("Successfully patched object status")
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

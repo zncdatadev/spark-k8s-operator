@@ -17,9 +17,12 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/zncdata-labs/operator-go/pkg/image"
+	"github.com/zncdata-labs/operator-go/pkg/ingress"
+	"github.com/zncdata-labs/operator-go/pkg/persistence"
+	"github.com/zncdata-labs/operator-go/pkg/service"
+	"github.com/zncdata-labs/operator-go/pkg/status"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +32,7 @@ import (
 // SparkHistoryServerSpec defines the desired state of SparkHistoryServer
 type SparkHistoryServerSpec struct {
 	// +kubebuilder:validation:Required
-	Image *ImageSpec `json:"image"`
+	Image *image.ImageSpec `json:"image"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Minimum=1
@@ -44,13 +47,13 @@ type SparkHistoryServerSpec struct {
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
 
 	// +kubebuilder:validation:Required
-	Persistence *PersistenceSpec `json:"persistence"`
+	Persistence *persistence.PersistenceSpec `json:"persistence"`
 
 	// +kubebuilder:validation:Required
-	Ingress *IngressSpec `json:"ingress"`
+	Ingress *ingress.IngressSpec `json:"ingress"`
 
 	// +kubebuilder:validation:Required
-	Service *ServiceSpec `json:"service"`
+	Service *service.ServiceSpec `json:"service"`
 
 	// +kubebuilder:validation:Optional
 	Labels map[string]string `json:"labels"`
@@ -69,45 +72,7 @@ type SparkHistoryServerSpec struct {
 }
 
 func (sparkHistory *SparkHistoryServer) GetNameWithSuffix(suffix string) string {
-	// return sparkHistory.GetName() + rand.String(5) + suffix
 	return sparkHistory.GetName() + suffix
-}
-
-type ImageSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="bitnami/spark"
-	Repository string `json:"repository,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="3.4.1"
-	Tag string `json:"tag,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=IfNotPresent
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
-}
-
-type PersistenceSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enable bool `json:"enable,omitempty"`
-	// +kubebuilder:validation:Optional
-	ExistingClaim *string `json:"existingClaim,omitempty"`
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="10Gi"
-	StorageSize string `json:"storageSize,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="ReadWriteOnce"
-	AccessMode string `json:"accessMode,omitempty"`
-	// +kubebuilder:validation:Optional
-	StorageClassName *string `json:"storageClassName,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=Filesystem
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
-}
-
-func (p *PersistenceSpec) Existing() bool {
-	return p.ExistingClaim != nil
 }
 
 func (sparkHistory *SparkHistoryServer) GetPvcName() string {
@@ -118,82 +83,16 @@ func (sparkHistory *SparkHistoryServer) GetPvcName() string {
 	return sparkHistory.GetNameWithSuffix("-pvc")
 }
 
-type IngressSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enabled bool `json:"enabled,omitempty"`
-	// +kubebuilder:validation:Optional
-	TLS *networkingv1.IngressTLS `json:"tls,omitempty"`
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="spark-history-server.example.com"
-	Host string `json:"host,omitempty"`
-}
-
-type ServiceSpec struct {
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
-	// +kubebuilder:default=ClusterIP
-	Type corev1.ServiceType `json:"type,omitempty"`
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=18080
-	Port int32 `json:"port"`
-}
-
 // SetStatusCondition updates the status condition using the provided arguments.
 // If the condition already exists, it updates the condition; otherwise, it appends the condition.
 // If the condition status has changed, it updates the condition's LastTransitionTime.
 func (sparkHistory *SparkHistoryServer) SetStatusCondition(condition metav1.Condition) {
-	// if the condition already exists, update it
-	existingCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, condition.Type)
-	if existingCondition == nil {
-		condition.ObservedGeneration = sparkHistory.GetGeneration()
-		condition.LastTransitionTime = metav1.Now()
-		sparkHistory.Status.Conditions = append(sparkHistory.Status.Conditions, condition)
-	} else if existingCondition.Status != condition.Status || existingCondition.Reason != condition.Reason || existingCondition.Message != condition.Message {
-		existingCondition.Status = condition.Status
-		existingCondition.Reason = condition.Reason
-		existingCondition.Message = condition.Message
-		existingCondition.ObservedGeneration = sparkHistory.GetGeneration()
-		existingCondition.LastTransitionTime = metav1.Now()
-	}
+	sparkHistory.Status.SetStatusCondition(condition)
 }
 
 // InitStatusConditions initializes the status conditions to the provided conditions.
 func (sparkHistory *SparkHistoryServer) InitStatusConditions() {
-	sparkHistory.Status.Conditions = []metav1.Condition{}
-	sparkHistory.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeProgressing,
-		Status:             metav1.ConditionTrue,
-		Reason:             ConditionReasonPreparing,
-		Message:            "SparkHistoryServer is preparing",
-		ObservedGeneration: sparkHistory.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
-	sparkHistory.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeAvailable,
-		Status:             metav1.ConditionFalse,
-		Reason:             ConditionReasonPreparing,
-		Message:            "SparkHistoryServer is preparing",
-		ObservedGeneration: sparkHistory.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
-}
-
-// SparkHistoryServerStatus defines the observed state of SparkHistoryServer
-type SparkHistoryServerStatus struct {
-	// +kubebuilder:validation:Optional
-	Conditions []metav1.Condition `json:"condition,omitempty"`
-	// +kubebuilder:validation:Optional
-	URLs []StatusURL `json:"urls,omitempty"`
-}
-
-type StatusURL struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	sparkHistory.Status.InitStatusConditions()
 }
 
 //+kubebuilder:object:root=true
@@ -204,8 +103,8 @@ type SparkHistoryServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SparkHistoryServerSpec   `json:"spec,omitempty"`
-	Status SparkHistoryServerStatus `json:"status,omitempty"`
+	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
+	Status status.ZncdataStatus   `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
