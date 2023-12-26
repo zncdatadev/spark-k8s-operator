@@ -92,6 +92,7 @@ func (sparkHistory *SparkHistoryServer) SetStatusCondition(condition metav1.Cond
 
 // InitStatusConditions initializes the status conditions to the provided conditions.
 func (sparkHistory *SparkHistoryServer) InitStatusConditions() {
+	sparkHistory.Status.InitStatus(sparkHistory)
 	sparkHistory.Status.InitStatusConditions()
 }
 

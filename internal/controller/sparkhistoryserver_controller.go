@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"github.com/go-logr/logr"
+	"github.com/zncdata-labs/operator-go/pkg/status"
 	"github.com/zncdata-labs/operator-go/pkg/utils"
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -71,7 +72,7 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// Get the status condition, if it exists and its generation is not the
 	//same as the SparkHistoryServer's generation, reset the status conditions
-	readCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, stackv1alpha1.ConditionTypeProgressing)
+	readCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, status.ConditionTypeProgressing)
 	if readCondition == nil || readCondition.ObservedGeneration != sparkHistory.GetGeneration() {
 		sparkHistory.InitStatusConditions()
 
@@ -87,33 +88,86 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		r.Log.Error(err, "unable to reconcile PVC")
 		return ctrl.Result{}, err
 	}
+	if updated := sparkHistory.Status.SetStatusCondition(metav1.Condition{
+		Type:               status.ConditionTypeReconcilePVC,
+		Status:             metav1.ConditionTrue,
+		Reason:             status.ConditionReasonRunning,
+		Message:            "SparkHistoryServer's PVC is running",
+		ObservedGeneration: sparkHistory.GetGeneration(),
+	}); updated {
+		if err := utils.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
+			r.Log.Error(err, "unable to update status for PVC")
+			return ctrl.Result{}, err
+		}
+	}
 
 	if err := r.reconcileDeployment(ctx, sparkHistory); err != nil {
 		r.Log.Error(err, "unable to reconcile Deployment")
 		return ctrl.Result{}, err
 	}
 
+	if updated := sparkHistory.Status.SetStatusCondition(metav1.Condition{
+		Type:               status.ConditionTypeReconcileDeployment,
+		Status:             metav1.ConditionTrue,
+		Reason:             status.ConditionReasonRunning,
+		Message:            "SparkHistoryServer's deployment is running",
+		ObservedGeneration: sparkHistory.GetGeneration(),
+	}); updated {
+		if err := utils.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
+			r.Log.Error(err, "unable to update status for Deployment")
+			return ctrl.Result{}, err
+		}
+	}
+
 	if err := r.reconcileService(ctx, sparkHistory); err != nil {
 		r.Log.Error(err, "unable to reconcile Service")
 		return ctrl.Result{}, err
+	}
+	if updated := sparkHistory.Status.SetStatusCondition(metav1.Condition{
+		Type:               status.ConditionTypeReconcileService,
+		Status:             metav1.ConditionTrue,
+		Reason:             status.ConditionReasonRunning,
+		Message:            "SparkHistoryServer's service is running",
+		ObservedGeneration: sparkHistory.GetGeneration(),
+	}); updated {
+		err := utils.UpdateStatus(ctx, r.Client, sparkHistory)
+		if err != nil {
+			r.Log.Error(err, "unable to update status for Service")
+			return ctrl.Result{}, err
+		}
 	}
 
 	if err := r.reconcileIngress(ctx, sparkHistory); err != nil {
 		r.Log.Error(err, "unable to reconcile Ingress")
 		return ctrl.Result{}, err
 	}
-
-	sparkHistory.SetStatusCondition(metav1.Condition{
-		Type:               stackv1alpha1.ConditionTypeAvailable,
+	if updated := sparkHistory.Status.SetStatusCondition(metav1.Condition{
+		Type:               status.ConditionTypeReconcileIngress,
 		Status:             metav1.ConditionTrue,
-		Reason:             stackv1alpha1.ConditionReasonRunning,
-		Message:            "SparkHistoryServer is running",
+		Reason:             status.ConditionReasonRunning,
+		Message:            "SparkHistoryServer's ingress is running",
 		ObservedGeneration: sparkHistory.GetGeneration(),
-	})
+	}); updated {
+		err := utils.UpdateStatus(ctx, r.Client, sparkHistory)
+		if err != nil {
+			r.Log.Error(err, "unable to update status for Ingress")
+			return ctrl.Result{}, err
+		}
+	}
 
-	if err := utils.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
-		r.Log.Error(err, "unable to update SparkHistoryServer status")
-		return ctrl.Result{}, err
+	if !sparkHistory.Status.IsAvailable() {
+		sparkHistory.SetStatusCondition(metav1.Condition{
+			Type:               status.ConditionTypeAvailable,
+			Status:             metav1.ConditionTrue,
+			Reason:             status.ConditionReasonRunning,
+			Message:            "SparkHistoryServer is running",
+			ObservedGeneration: sparkHistory.GetGeneration(),
+		})
+
+		if err := utils.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
+			r.Log.Error(err, "unable to update SparkHistoryServer status")
+			return ctrl.Result{}, err
+		}
 	}
 
 	r.Log.Info("Successfully reconciled SparkHistoryServer")

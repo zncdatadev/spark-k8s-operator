@@ -6,7 +6,6 @@ import (
 	zncdataerr "github.com/zncdata-labs/operator-go/pkg/errors"
 	"github.com/zncdata-labs/operator-go/pkg/status"
 	"github.com/zncdata-labs/operator-go/pkg/utils"
-
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
