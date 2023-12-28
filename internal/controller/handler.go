@@ -4,20 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/zncdata-labs/operator-go/pkg/errors"
+	"github.com/zncdata-labs/operator-go/pkg/status"
+
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strconv"
 )
 
-func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.PersistentVolumeClaim {
+func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*corev1.PersistentVolumeClaim, error) {
 	labels := instance.GetLabels()
+
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetPvcName(),
@@ -27,7 +30,7 @@ func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHist
 		Spec: corev1.PersistentVolumeClaimSpec{
 			StorageClassName: instance.Spec.Persistence.StorageClassName,
 			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.PersistentVolumeAccessMode(instance.Spec.Persistence.AccessMode)},
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse(instance.Spec.Persistence.StorageSize),
 				},
@@ -35,36 +38,31 @@ func (r *SparkHistoryServerReconciler) makePVC(instance *stackv1alpha1.SparkHist
 			VolumeMode: instance.Spec.Persistence.VolumeMode,
 		},
 	}
+
 	err := ctrl.SetControllerReference(instance, pvc, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for pvc")
-		return nil
+		return nil, errors.Wrap(err, "Failed to set controller reference for pvc")
 	}
-	return pvc
+	return pvc, nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcilePVC(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	if instance.Spec.Persistence.Enable == false {
-		return nil
+	pvc, err := r.makePVC(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Client.Get(ctx, types.NamespacedName{Namespace: instance.Namespace, Name: instance.GetPvcName()}, pvc)
-	if err != nil && errors.IsNotFound(err) {
-		pvc := r.makePVC(instance, r.Scheme)
-		r.Log.Info("Creating a new PVC", "PVC.Namespace", pvc.Namespace, "PVC.Name", pvc.Name)
-		err := r.Client.Create(ctx, pvc)
-		if err != nil {
+	if instance.Spec.Persistence.Enable == true {
+		if err := CreateOrUpdate(ctx, r.Client, pvc); err != nil {
+			r.Log.Error(err, "Failed to create or update pvc")
 			return err
 		}
-	} else if err != nil {
-		r.Log.Error(err, "Failed to get PVC")
-		return err
 	}
 	return nil
 }
 
-func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *v1.Ingress {
+func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*v1.Ingress, error) {
 	labels := instance.GetLabels()
 
 	pt := v1.PathTypeImplementationSpecific
@@ -104,15 +102,15 @@ func (r *SparkHistoryServerReconciler) makeIngress(instance *stackv1alpha1.Spark
 	err := ctrl.SetControllerReference(instance, ing, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for ingress")
-		return nil
+		return nil, errors.Wrap(err, "Failed to set controller reference for ingress")
 	}
-	return ing
+	return ing, nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	obj := r.makeIngress(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeIngress(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
@@ -123,7 +121,7 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 	if instance.Spec.Ingress.Enabled {
 		url := fmt.Sprintf("http://%s", instance.Spec.Ingress.Host)
 		if instance.Status.URLs == nil {
-			instance.Status.URLs = []stackv1alpha1.StatusURL{
+			instance.Status.URLs = []status.URL{
 				{
 					Name: "webui",
 					URL:  url,
@@ -145,7 +143,7 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 	return nil
 }
 
-func (r *SparkHistoryServerReconciler) makeService(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *corev1.Service {
+func (r *SparkHistoryServerReconciler) makeService(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*corev1.Service, error) {
 	labels := instance.GetLabels()
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -169,15 +167,15 @@ func (r *SparkHistoryServerReconciler) makeService(instance *stackv1alpha1.Spark
 	err := ctrl.SetControllerReference(instance, svc, schema)
 	if err != nil {
 		r.Log.Error(err, "Failed to set controller reference for service")
-		return nil
+		return nil, errors.Wrap(err, "Failed to set controller reference for service")
 	}
-	return svc
+	return svc, nil
 }
 
 func (r *SparkHistoryServerReconciler) reconcileService(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	obj := r.makeService(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	obj, err := r.makeService(instance, r.Scheme)
+	if err != nil {
+		return err
 	}
 
 	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
@@ -187,17 +185,164 @@ func (r *SparkHistoryServerReconciler) reconcileService(ctx context.Context, ins
 	return nil
 }
 
-func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) *appsv1.Deployment {
+func (r *SparkHistoryServerReconciler) makeDeployments(instance *stackv1alpha1.SparkHistoryServer) []*appsv1.Deployment {
+	var deployments []*appsv1.Deployment
+
+	if instance.Spec.RoleGroups != nil {
+		for roleGroupName, roleGroup := range instance.Spec.RoleGroups {
+			if roleGroup != nil {
+				if len(instance.Spec.Selectors) == 0 {
+					dep := r.makeDefaultDeploymentForRoleGroup(instance, roleGroupName, roleGroup, r.Scheme)
+					if dep != nil {
+						deployments = append(deployments, dep)
+					}
+				} else {
+					for _, selectors := range instance.Spec.Selectors {
+						dep := r.makeDeploymentForRoleGroup(instance, roleGroupName, roleGroup, selectors, r.Scheme)
+						if dep != nil {
+							deployments = append(deployments, dep)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return deployments
+}
+
+func (r *SparkHistoryServerReconciler) makeDeploymentForRoleGroup(instance *stackv1alpha1.SparkHistoryServer, roleGroupName string, roleGroup *stackv1alpha1.RoleGroupSpec, selectors *stackv1alpha1.SelectorSpec, schema *runtime.Scheme) *appsv1.Deployment {
+	labels := instance.GetLabels()
+
+	additionalLabels := make(map[string]string)
+
+	if instance.Spec.Selectors != nil {
+		for _, selectorSpec := range instance.Spec.Selectors {
+			if selectorSpec != nil && selectorSpec.Selector.MatchLabels != nil {
+				for k, v := range selectorSpec.Selector.MatchLabels {
+					additionalLabels[k] = v
+				}
+			}
+		}
+	}
+
+	mergedLabels := make(map[string]string)
+	for key, value := range labels {
+		mergedLabels[key] = value
+	}
+	for key, value := range additionalLabels {
+		mergedLabels[key] = value
+	}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.GetNameWithSuffix(roleGroupName),
+			Namespace: instance.Namespace,
+			Labels:    mergedLabels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &roleGroup.Replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: mergedLabels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: mergedLabels,
+				},
+				Spec: corev1.PodSpec{
+					SecurityContext: instance.Spec.SecurityContext,
+					Containers: []corev1.Container{
+						{
+							Name:            instance.Name,
+							Image:           instance.Spec.Image.Repository + ":" + instance.Spec.Image.Tag,
+							ImagePullPolicy: instance.Spec.Image.PullPolicy,
+							Resources:       *roleGroup.Config.Resources,
+							Args: []string{
+								"/opt/bitnami/spark/sbin/start-history-server.sh",
+							},
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 18080,
+									Name:          "http",
+									Protocol:      "TCP",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if &selectors.NodeSelector != nil {
+		dep.Spec.Template.Spec.NodeSelector = selectors.NodeSelector
+	}
+
+	SparkHistoryServerScheduler(instance, dep, roleGroup)
+
+	mountPath := "/tmp/spark-events"
+	if instance.Spec.RoleConfig != nil && instance.Spec.RoleConfig.EventLog != nil && instance.Spec.RoleConfig.EventLog.Dir != "" {
+		mountPath = instance.Spec.RoleConfig.EventLog.Dir
+	}
+
+	if instance.Spec.Persistence.Enable == true {
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: instance.GetNameWithSuffix("data"),
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: instance.GetPvcName(),
+				},
+			},
+		})
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      instance.GetNameWithSuffix("data"),
+			MountPath: mountPath,
+		})
+	} else {
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: instance.GetNameWithSuffix("data"),
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		})
+	}
+
+	if instance.Spec.RoleConfig != nil && instance.Spec.RoleConfig.EventLog.Enabled == true {
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: instance.GetNameWithSuffix("conf"),
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: instance.GetNameWithSuffix("conf"),
+					},
+				},
+			},
+		})
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      instance.GetNameWithSuffix("conf"),
+			MountPath: "/opt/bitnami/spark/conf/spark-defaults.conf",
+			SubPath:   "spark-defaults.conf",
+		})
+	}
+
+	err := ctrl.SetControllerReference(instance, dep, schema)
+	if err != nil {
+		r.Log.Error(err, "Failed to set controller reference for deployment")
+		return nil
+	}
+	return dep
+}
+
+func (r *SparkHistoryServerReconciler) makeDefaultDeploymentForRoleGroup(instance *stackv1alpha1.SparkHistoryServer, roleGroupName string, roleGroup *stackv1alpha1.RoleGroupSpec, schema *runtime.Scheme) *appsv1.Deployment {
 	labels := instance.GetLabels()
 
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Name,
+			Name:      instance.GetNameWithSuffix(roleGroupName),
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &instance.Spec.Replicas,
+			Replicas: &roleGroup.Replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -212,21 +357,15 @@ func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.Sp
 							Name:            instance.Name,
 							Image:           instance.Spec.Image.Repository + ":" + instance.Spec.Image.Tag,
 							ImagePullPolicy: instance.Spec.Image.PullPolicy,
+							Resources:       *roleGroup.Config.Resources,
 							Args: []string{
 								"/opt/bitnami/spark/sbin/start-history-server.sh",
 							},
-							Resources: *instance.Spec.Resources,
 							Ports: []corev1.ContainerPort{
 								{
 									ContainerPort: 18080,
 									Name:          "http",
 									Protocol:      "TCP",
-								},
-							},
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      instance.GetNameWithSuffix("-data"),
-									MountPath: "/tmp/spark-events",
 								},
 							},
 						},
@@ -236,23 +375,50 @@ func (r *SparkHistoryServerReconciler) makeDeployment(instance *stackv1alpha1.Sp
 		},
 	}
 
-	SparkHistoryServerScheduler(instance, dep)
+	SparkHistoryServerScheduler(instance, dep, roleGroup)
+
+	mountPath := "/tmp/spark-events"
+	if instance.Spec.RoleConfig != nil && instance.Spec.RoleConfig.EventLog != nil && instance.Spec.RoleConfig.EventLog.Dir != "" {
+		mountPath = instance.Spec.RoleConfig.EventLog.Dir
+	}
 
 	if instance.Spec.Persistence.Enable == true {
 		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: instance.GetNameWithSuffix("-data"),
+			Name: instance.GetNameWithSuffix("data"),
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: instance.GetPvcName(),
 				},
 			},
 		})
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      instance.GetNameWithSuffix("data"),
+			MountPath: mountPath,
+		})
 	} else {
 		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: instance.GetNameWithSuffix("-data"),
+			Name: instance.GetNameWithSuffix("data"),
 			VolumeSource: corev1.VolumeSource{
 				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
+		})
+	}
+
+	if instance.Spec.RoleConfig != nil && instance.Spec.RoleConfig.EventLog.Enabled == true {
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: instance.GetNameWithSuffix("conf"),
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: instance.GetNameWithSuffix("conf"),
+					},
+				},
+			},
+		})
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+			Name:      instance.GetNameWithSuffix("conf"),
+			MountPath: "/opt/bitnami/spark/conf/spark-defaults.conf",
+			SubPath:   "spark-defaults.conf",
 		})
 	}
 
@@ -281,14 +447,89 @@ func (r *SparkHistoryServerReconciler) updateStatusConditionWithDeployment(ctx c
 }
 
 func (r *SparkHistoryServerReconciler) reconcileDeployment(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
-	obj := r.makeDeployment(instance, r.Scheme)
-	if obj == nil {
-		return nil
+	Deployments := r.makeDeployments(instance)
+	for _, dep := range Deployments {
+		if dep == nil {
+			continue
+		}
+
+		if err := CreateOrUpdate(ctx, r.Client, dep); err != nil {
+			r.Log.Error(err, "Failed to create or update Deployment", "deployment", dep.Name)
+			return err
+		}
 	}
-	if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
-		logger.Error(err, "Failed to create or update deployment")
+
+	return nil
+}
+
+func (r *SparkHistoryServerReconciler) makeConfigMap(instance *stackv1alpha1.SparkHistoryServer, schema *runtime.Scheme) (*corev1.ConfigMap, error) {
+	labels := instance.GetLabels()
+
+	if instance.Spec.RoleConfig == nil {
+		return nil, nil
+	}
+
+	eventLogDir := ""
+	sparkDefaultsConf := ""
+	if instance.Spec.RoleConfig.EventLog != nil {
+		eventLogDir = instance.Spec.RoleConfig.EventLog.Dir
+		if instance.Spec.RoleConfig.EventLog.MountMode == "pvc" {
+			eventLogDir = "file://" + eventLogDir
+		} else if instance.Spec.RoleConfig.EventLog.MountMode == "s3" {
+			eventLogDir = "s3a:/" + eventLogDir
+			sparkDefaultsConf += "spark.hadoop.fs.s3a.endpoint" + " " + instance.Spec.RoleConfig.S3.Endpoint + "\n" +
+				"spark.hadoop.fs.s3a.ssl.enabled" + " " + strconv.FormatBool(instance.Spec.RoleConfig.S3.EnableSSL) + "\n" +
+				"spark.hadoop.fs.s3a.impl" + " " + instance.Spec.RoleConfig.S3.Impl + "\n" +
+				"spark.hadoop.fs.s3a.fast.upload" + " " + strconv.FormatBool(instance.Spec.RoleConfig.S3.FastUpload) + "\n" +
+				"spark.hadoop.fs.s3a.access.key" + " " + instance.Spec.RoleConfig.S3.AccessKey + "\n" +
+				"spark.hadoop.fs.s3a.secret.key" + " " + instance.Spec.RoleConfig.S3.SecretKey + "\n" +
+				"spark.hadoop.fs.s3a.path.style.access" + " " + strconv.FormatBool(instance.Spec.RoleConfig.S3.PathStyleAccess) + "\n"
+		}
+	}
+
+	if instance.Spec.RoleConfig.EventLog != nil {
+		sparkDefaultsConf += "spark.eventLog.enabled" + " " + strconv.FormatBool(instance.Spec.RoleConfig.EventLog.Enabled) + "\n" +
+			"spark.eventLog.dir" + " " + eventLogDir + "\n" +
+			"spark.history.fs.logDirectory" + " " + eventLogDir + "\n"
+	}
+
+	if instance.Spec.RoleConfig.History != nil {
+		sparkDefaultsConf += "spark.history.fs.cleaner.enabled" + " " + strconv.FormatBool(instance.Spec.RoleConfig.History.FsCleaner.Enabled) + "\n" +
+			"spark.history.fs.cleaner.maxNum" + " " + strconv.Itoa(int(instance.Spec.RoleConfig.History.FsCleaner.MaxNum)) + "\n" +
+			"spark.history.fs.cleaner.maxAge" + " " + instance.Spec.RoleConfig.History.FsCleaner.MaxAge + "\n" +
+			"spark.history.fs.eventLog.rolling.maxFilesToRetain" + " " + strconv.Itoa(int(instance.Spec.RoleConfig.History.FsEnentLogRollingMaxFiles)) + "\n"
+	}
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.GetNameWithSuffix("conf"),
+			Namespace: instance.Namespace,
+			Labels:    labels,
+		},
+		Data: map[string]string{
+			"spark-defaults.conf": sparkDefaultsConf,
+		},
+	}
+
+	err := ctrl.SetControllerReference(instance, cm, schema)
+	if err != nil {
+		r.Log.Error(err, "Failed to set controller reference for configmap")
+		return nil, errors.Wrap(err, "Failed to set controller reference for configmap")
+	}
+	return cm, nil
+}
+
+func (r *SparkHistoryServerReconciler) reconcileConfigMap(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
+	obj, err := r.makeConfigMap(instance, r.Scheme)
+	if err != nil {
 		return err
 	}
 
+	if instance.Spec.RoleConfig != nil {
+		if err := CreateOrUpdate(ctx, r.Client, obj); err != nil {
+			r.Log.Error(err, "Failed to create or update configmap")
+			return err
+		}
+	}
 	return nil
 }

@@ -17,9 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/zncdata-labs/operator-go/pkg/status"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,15 +32,15 @@ type SparkHistoryServerSpec struct {
 	Image *ImageSpec `json:"image"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default:=1
-	Replicas int32 `json:"replicas,omitempty"`
+	Selectors map[string]*SelectorSpec `json:"selectors"`
 
-	// +kubebuilder:validation:Required
-	Resources *corev1.ResourceRequirements `json:"resources"`
+	// +kubebuilder:validation:Optional
+	RoleConfig *RoleConfigSpec `json:"roleConfig"`
 
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
+	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups"`
+
+	// +kubebuilder:validation:Optional
 	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
 
 	// +kubebuilder:validation:Required
@@ -49,7 +49,7 @@ type SparkHistoryServerSpec struct {
 	// +kubebuilder:validation:Required
 	Ingress *IngressSpec `json:"ingress"`
 
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	Service *ServiceSpec `json:"service"`
 
 	// +kubebuilder:validation:Optional
@@ -57,20 +57,121 @@ type SparkHistoryServerSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Annotations map[string]string `json:"annotations"`
+}
+
+type RoleConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	EventLog *EventLogSpec `json:"eventLog"`
 
 	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector"`
+	History *HistorySpec `json:"history"`
+
+	// +kubebuilder:validation:Optional
+	S3 *S3Spec `json:"s3"`
+}
+
+type S3Spec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="http://bucket.example.com"
+	Endpoint string `json:"endpoint"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="us-east-1"
+	Region string `json:"region"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	EnableSSL bool `json:"enableSSL"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="org.apache.hadoop.fs.s3a.S3AFileSystem"
+	Impl string `json:"impl"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	FastUpload bool `json:"fastUpload"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="accessKey"
+	AccessKey string `json:"accessKey"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="secret"
+	SecretKey string `json:"secretKey"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	PathStyleAccess bool `json:"pathStyleAccess"`
+}
+
+type HistorySpec struct {
+	// +kubebuilder:validation:Optional
+	FsCleaner *FsCleanerSpec `json:"fsCleaner"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=20
+	FsEnentLogRollingMaxFiles int32 `json:"fsEnentLogRollingMaxFiles"`
+}
+
+type FsCleanerSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=50
+	MaxNum int32 `json:"maxNum,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="7d"
+	MaxAge string `json:"maxAge,omitempty"`
+}
+
+type EventLogSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="/tmp/spark-events"
+	Dir string `json:"dir,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="pvc"
+	MountMode string `json:"mountMode,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default:=false
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+type RoleGroupSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=1
+	Replicas int32 `json:"replicas"`
+
+	// +kubebuilder:validation:Optional
+	Config *ConfigRoleGroupSpec `json:"config"`
+}
+
+type ConfigRoleGroupSpec struct {
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity"`
 
 	// +kubebuilder:validation:Optional
 	Tolerations *corev1.Toleration `json:"tolerations"`
 
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
+	// +kubebuilder:validation:Required
+	Resources *corev1.ResourceRequirements `json:"resources"`
 }
 
-func (sparkHistory *SparkHistoryServer) GetNameWithSuffix(suffix string) string {
+type SelectorSpec struct {
+	// +kubebuilder:validation:Optional
+	Selector metav1.LabelSelector `json:"selector"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector"`
+}
+
+func (r *SparkHistoryServer) GetNameWithSuffix(suffix string) string {
 	// return sparkHistory.GetName() + rand.String(5) + suffix
-	return sparkHistory.GetName() + suffix
+	return r.GetName() + "-" + suffix
 }
 
 type ImageSpec struct {
@@ -110,12 +211,12 @@ func (p *PersistenceSpec) Existing() bool {
 	return p.ExistingClaim != nil
 }
 
-func (sparkHistory *SparkHistoryServer) GetPvcName() string {
-	if sparkHistory.Spec.Persistence != nil && sparkHistory.Spec.Persistence.Existing() {
-		return *sparkHistory.Spec.Persistence.ExistingClaim
+func (r *SparkHistoryServer) GetPvcName() string {
+	if r.Spec.Persistence != nil && r.Spec.Persistence.Existing() {
+		return *r.Spec.Persistence.ExistingClaim
 	}
 
-	return sparkHistory.GetNameWithSuffix("-pvc")
+	return r.GetNameWithSuffix("pvc")
 }
 
 type IngressSpec struct {
@@ -146,54 +247,14 @@ type ServiceSpec struct {
 // SetStatusCondition updates the status condition using the provided arguments.
 // If the condition already exists, it updates the condition; otherwise, it appends the condition.
 // If the condition status has changed, it updates the condition's LastTransitionTime.
-func (sparkHistory *SparkHistoryServer) SetStatusCondition(condition metav1.Condition) {
-	// if the condition already exists, update it
-	existingCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, condition.Type)
-	if existingCondition == nil {
-		condition.ObservedGeneration = sparkHistory.GetGeneration()
-		condition.LastTransitionTime = metav1.Now()
-		sparkHistory.Status.Conditions = append(sparkHistory.Status.Conditions, condition)
-	} else if existingCondition.Status != condition.Status || existingCondition.Reason != condition.Reason || existingCondition.Message != condition.Message {
-		existingCondition.Status = condition.Status
-		existingCondition.Reason = condition.Reason
-		existingCondition.Message = condition.Message
-		existingCondition.ObservedGeneration = sparkHistory.GetGeneration()
-		existingCondition.LastTransitionTime = metav1.Now()
-	}
+func (r *SparkHistoryServer) SetStatusCondition(condition metav1.Condition) {
+	r.Status.SetStatusCondition(condition)
 }
 
 // InitStatusConditions initializes the status conditions to the provided conditions.
-func (sparkHistory *SparkHistoryServer) InitStatusConditions() {
-	sparkHistory.Status.Conditions = []metav1.Condition{}
-	sparkHistory.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeProgressing,
-		Status:             metav1.ConditionTrue,
-		Reason:             ConditionReasonPreparing,
-		Message:            "SparkHistoryServer is preparing",
-		ObservedGeneration: sparkHistory.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
-	sparkHistory.SetStatusCondition(metav1.Condition{
-		Type:               ConditionTypeAvailable,
-		Status:             metav1.ConditionFalse,
-		Reason:             ConditionReasonPreparing,
-		Message:            "SparkHistoryServer is preparing",
-		ObservedGeneration: sparkHistory.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	})
-}
-
-// SparkHistoryServerStatus defines the observed state of SparkHistoryServer
-type SparkHistoryServerStatus struct {
-	// +kubebuilder:validation:Optional
-	Conditions []metav1.Condition `json:"condition,omitempty"`
-	// +kubebuilder:validation:Optional
-	URLs []StatusURL `json:"urls,omitempty"`
-}
-
-type StatusURL struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+func (r *SparkHistoryServer) InitStatusConditions() {
+	r.Status.InitStatus(r)
+	r.Status.InitStatusConditions()
 }
 
 //+kubebuilder:object:root=true
@@ -204,8 +265,8 @@ type SparkHistoryServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SparkHistoryServerSpec   `json:"spec,omitempty"`
-	Status SparkHistoryServerStatus `json:"status,omitempty"`
+	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
+	Status *status.Status         `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
