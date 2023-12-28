@@ -161,7 +161,7 @@ spec:
                         default: false
                         type: boolean
                       endpoint:
-                        default: bucket.example.com
+                        default: http://bucket.example.com
                         type: string
                       fastUpload:
                         default: true

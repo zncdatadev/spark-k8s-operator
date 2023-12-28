@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"github.com/zncdata-labs/operator-go/pkg/utils"
 
 	"github.com/zncdata-labs/operator-go/pkg/errors"
 	"github.com/zncdata-labs/operator-go/pkg/status"
@@ -127,13 +128,13 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 					URL:  url,
 				},
 			}
-			if err := r.UpdateStatus(ctx, instance); err != nil {
+			if err := utils.UpdateStatus(ctx, r.Client, instance); err != nil {
 				return err
 			}
 
 		} else if instance.Spec.Ingress.Host != instance.Status.URLs[0].Name {
 			instance.Status.URLs[0].URL = url
-			if err := r.UpdateStatus(ctx, instance); err != nil {
+			if err := utils.UpdateStatus(ctx, r.Client, instance); err != nil {
 				return err
 			}
 
@@ -440,7 +441,7 @@ func (r *SparkHistoryServerReconciler) updateStatusConditionWithDeployment(ctx c
 		LastTransitionTime: metav1.Now(),
 	})
 
-	if err := r.UpdateStatus(ctx, instance); err != nil {
+	if err := utils.UpdateStatus(ctx, r.Client, instance); err != nil {
 		return err
 	}
 	return nil
