@@ -1298,6 +1298,108 @@ spec:
                                   type: array
                               type: object
                           type: object
+                        eventLog:
+                          properties:
+                            dir:
+                              default: /tmp/spark-events
+                              type: string
+                            enabled:
+                              default: false
+                              type: boolean
+                            mountMode:
+                              default: pvc
+                              type: string
+                          type: object
+                        history:
+                          properties:
+                            fsCleaner:
+                              properties:
+                                enabled:
+                                  default: true
+                                  type: boolean
+                                maxAge:
+                                  default: 7d
+                                  type: string
+                                maxNum:
+                                  default: 50
+                                  format: int32
+                                  type: integer
+                              type: object
+                            fsEnentLogRollingMaxFiles:
+                              default: 20
+                              format: int32
+                              type: integer
+                          type: object
+                        ingress:
+                          properties:
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            enabled:
+                              default: true
+                              type: boolean
+                            host:
+                              default: spark-history-server.example.com
+                              type: string
+                            tls:
+                              description: IngressTLS describes the transport layer
+                                security associated with an ingress.
+                              properties:
+                                hosts:
+                                  description: hosts is a list of hosts included in
+                                    the TLS certificate. The values in this list must
+                                    match the name/s used in the tlsSecret. Defaults
+                                    to the wildcard host setting for the loadbalancer
+                                    controller fulfilling this Ingress, if left unspecified.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                secretName:
+                                  description: secretName is the name of the secret
+                                    used to terminate TLS traffic on port 443. Field
+                                    is left optional to allow TLS routing based on
+                                    SNI hostname alone. If the SNI host in a listener
+                                    conflicts with the "Host" header field used by
+                                    an IngressRule, the SNI host is used for termination
+                                    and value of the "Host" header is used for routing.
+                                  type: string
+                              type: object
+                          type: object
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        nodeSelector:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        persistence:
+                          properties:
+                            accessMode:
+                              default: ReadWriteOnce
+                              type: string
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            enable:
+                              default: true
+                              type: boolean
+                            existingClaim:
+                              type: string
+                            storageClassName:
+                              type: string
+                            storageSize:
+                              default: 10Gi
+                              type: string
+                            volumeMode:
+                              default: Filesystem
+                              description: PersistentVolumeMode describes how a volume
+                                is intended to be consumed, either Block or Filesystem.
+                              type: string
+                          type: object
                         resources:
                           description: ResourceRequirements describes the compute
                             resource requirements.
@@ -1349,6 +1451,53 @@ spec:
                                 value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                               type: object
                           type: object
+                        s3:
+                          properties:
+                            accessKey:
+                              default: accessKey
+                              type: string
+                            enableSSL:
+                              default: false
+                              type: boolean
+                            endpoint:
+                              default: http://bucket.example.com
+                              type: string
+                            fastUpload:
+                              default: true
+                              type: boolean
+                            impl:
+                              default: org.apache.hadoop.fs.s3a.S3AFileSystem
+                              type: string
+                            pathStyleAccess:
+                              default: true
+                              type: boolean
+                            region:
+                              default: us-east-1
+                              type: string
+                            secretKey:
+                              default: secret
+                              type: string
+                          type: object
+                        service:
+                          properties:
+                            annotations:
+                              additionalProperties:
+                                type: string
+                              type: object
+                            port:
+                              default: 18080
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                              type: integer
+                            type:
+                              default: ClusterIP
+                              description: Service Type string describes ingress methods
+                                for a service
+                              type: string
+                          required:
+                          - port
+                          type: object
                         tolerations:
                           description: The pod this Toleration is attached to tolerates
                             any taint that matches the triple <key,value,effect> using
@@ -1388,8 +1537,6 @@ spec:
                                 be empty, otherwise just a regular string.
                               type: string
                           type: object
-                      required:
-                      - resources
                       type: object
                     replicas:
                       default: 1
@@ -1565,63 +1712,6 @@ spec:
                           value specified in SecurityContext takes precedence.
                         type: string
                     type: object
-                type: object
-              selectors:
-                additionalProperties:
-                  properties:
-                    nodeSelector:
-                      additionalProperties:
-                        type: string
-                      type: object
-                    selector:
-                      description: A label selector is a label query over a set of
-                        resources. The result of matchLabels and matchExpressions
-                        are ANDed. An empty label selector matches all objects. A
-                        null label selector matches no objects.
-                      properties:
-                        matchExpressions:
-                          description: matchExpressions is a list of label selector
-                            requirements. The requirements are ANDed.
-                          items:
-                            description: A label selector requirement is a selector
-                              that contains values, a key, and an operator that relates
-                              the key and values.
-                            properties:
-                              key:
-                                description: key is the label key that the selector
-                                  applies to.
-                                type: string
-                              operator:
-                                description: operator represents a key's relationship
-                                  to a set of values. Valid operators are In, NotIn,
-                                  Exists and DoesNotExist.
-                                type: string
-                              values:
-                                description: values is an array of string values.
-                                  If the operator is In or NotIn, the values array
-                                  must be non-empty. If the operator is Exists or
-                                  DoesNotExist, the values array must be empty. This
-                                  array is replaced during a strategic merge patch.
-                                items:
-                                  type: string
-                                type: array
-                            required:
-                            - key
-                            - operator
-                            type: object
-                          type: array
-                        matchLabels:
-                          additionalProperties:
-                            type: string
-                          description: matchLabels is a map of {key,value} pairs.
-                            A single {key,value} in the matchLabels map is equivalent
-                            to an element of matchExpressions, whose key field is
-                            "key", the operator is "In", and the values array contains
-                            only "value". The requirements are ANDed.
-                          type: object
-                      type: object
-                      x-kubernetes-map-type: atomic
-                  type: object
                 type: object
               service:
                 properties:

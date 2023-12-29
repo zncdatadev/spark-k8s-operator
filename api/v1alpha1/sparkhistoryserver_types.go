@@ -32,9 +32,6 @@ type SparkHistoryServerSpec struct {
 	Image *ImageSpec `json:"image"`
 
 	// +kubebuilder:validation:Optional
-	Selectors map[string]*SelectorSpec `json:"selectors"`
-
-	// +kubebuilder:validation:Optional
 	RoleConfig *RoleConfigSpec `json:"roleConfig"`
 
 	// +kubebuilder:validation:Optional
@@ -152,21 +149,37 @@ type RoleGroupSpec struct {
 
 type ConfigRoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	Affinity *corev1.Affinity `json:"affinity"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector"`
 
 	// +kubebuilder:validation:Optional
 	Tolerations *corev1.Toleration `json:"tolerations"`
 
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	Resources *corev1.ResourceRequirements `json:"resources"`
-}
-
-type SelectorSpec struct {
-	// +kubebuilder:validation:Optional
-	Selector metav1.LabelSelector `json:"selector"`
 
 	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector"`
+	Ingress *IngressSpec `json:"ingress"`
+
+	// +kubebuilder:validation:Optional
+	Service *ServiceSpec `json:"service"`
+
+	// +kubebuilder:validation:Optional
+	Persistence *PersistenceSpec `json:"persistence"`
+
+	// +kubebuilder:validation:Optional
+	EventLog *EventLogSpec `json:"eventLog"`
+
+	// +kubebuilder:validation:Optional
+	History *HistorySpec `json:"history"`
+
+	// +kubebuilder:validation:Optional
+	S3 *S3Spec `json:"s3"`
 }
 
 func (r *SparkHistoryServer) GetNameWithSuffix(suffix string) string {
@@ -209,14 +222,6 @@ type PersistenceSpec struct {
 
 func (p *PersistenceSpec) Existing() bool {
 	return p.ExistingClaim != nil
-}
-
-func (r *SparkHistoryServer) GetPvcName() string {
-	if r.Spec.Persistence != nil && r.Spec.Persistence.Existing() {
-		return *r.Spec.Persistence.ExistingClaim
-	}
-
-	return r.GetNameWithSuffix("pvc")
 }
 
 type IngressSpec struct {

@@ -37,11 +37,17 @@ spec:
           requests:
             cpu: 100m
             memory: 512Mi
-  selectors:
-    default:
-      selector:
         matchLabels:
-          app: sparkhistoryserver
+            app: default
+    foo:
+        replicas: 2
+        config:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+            matchLabels:
+                app: foo
   roleConfig:
     eventLog:
         enabled: true
