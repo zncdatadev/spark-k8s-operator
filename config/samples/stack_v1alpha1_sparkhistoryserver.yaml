@@ -40,7 +40,7 @@ spec:
         matchLabels:
             app: default
     foo:
-        replicas: 2
+        replicas: 1
         config:
             resources:
               requests:
