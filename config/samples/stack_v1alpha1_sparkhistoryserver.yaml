@@ -9,15 +9,10 @@ metadata:
     app.kubernetes.io/created-by: spark-k8s-operator
   name: sparkhistoryserver-sample
 spec:
-  replicas: 1
   image:
     repository: bitnami/spark
     tag: 3.1.1
     pullPolicy: IfNotPresent
-  resources:
-    requests:
-        cpu: 100m
-        memory: 512Mi
   service:
     port: 18080
     type: ClusterIP
@@ -34,6 +29,32 @@ spec:
     accessMode: ReadWriteOnce
     storageSize: 1Gi
     volumeMode: Filesystem
+  roleGroups:
+    default:
+      replicas: 1
+      config:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        matchLabels:
+            app: default
+        ingress:
+          enabled: false
+    foo:
+        replicas: 1
+        config:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+            matchLabels:
+                app: foo
+  roleConfig:
+    eventLog:
+        enabled: true
+        mountMode: pvc
+        dir: /tmp/spark-events
   securityContext:
     runAsUser: 1000
     fsGroup: 1000
