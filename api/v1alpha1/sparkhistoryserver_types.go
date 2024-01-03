@@ -149,6 +149,12 @@ type RoleGroupSpec struct {
 
 type ConfigRoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
+	Image *ImageSpec `json:"image"`
+
+	// +kubebuilder:validation:Optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+
+	// +kubebuilder:validation:Optional
 	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -271,7 +277,7 @@ type SparkHistoryServer struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
-	Status *status.Status         `json:"status,omitempty"`
+	Status status.Status          `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

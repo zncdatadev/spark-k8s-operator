@@ -39,6 +39,8 @@ spec:
             memory: 512Mi
         matchLabels:
             app: default
+        ingress:
+          enabled: false
     foo:
         replicas: 1
         config:

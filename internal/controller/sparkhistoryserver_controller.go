@@ -70,10 +70,6 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	if sparkHistory.Status == nil {
-		sparkHistory.Status = &status.Status{}
-		sparkHistory.Status.InitStatus(sparkHistory)
-	}
 	// Get the status condition, if it exists and its generation is not the
 	//same as the SparkHistoryServer's generation, reset the status conditions
 	readCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, status.ConditionTypeProgressing)

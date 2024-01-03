@@ -211,7 +211,6 @@ func (r *SparkHistoryServerReconciler) makeIngressForRoleGroup(instance *stackv1
 		return nil, errors.Wrap(err, "Failed to set controller reference for ingress")
 	}
 	return ing, nil
-
 }
 
 func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, instance *stackv1alpha1.SparkHistoryServer) error {
@@ -219,13 +218,16 @@ func (r *SparkHistoryServerReconciler) reconcileIngress(ctx context.Context, ins
 	if err != nil {
 		return err
 	}
-	for _, ingress := range obj {
-		if err := CreateOrUpdate(ctx, r.Client, ingress); err != nil {
-			r.Log.Error(err, "Failed to create or update ingress")
-			return err
+	if r != nil && r.Client != nil {
+		for _, ingress := range obj {
+			if ingress != nil {
+				if err := CreateOrUpdate(ctx, r.Client, ingress); err != nil {
+					r.Log.Error(err, "Failed to create or update ingress")
+					return err
+				}
+			}
 		}
 	}
-
 	if instance.Spec.Ingress.Enabled {
 		url := fmt.Sprintf("http://%s", instance.Spec.Ingress.Host)
 		if instance.Status.URLs == nil {
@@ -380,6 +382,22 @@ func (r *SparkHistoryServerReconciler) makeDeploymentForRoleGroup(instance *stac
 	for key, value := range additionalLabels {
 		mergedLabels[key] = value
 	}
+
+	var image stackv1alpha1.ImageSpec
+	var securityContext *corev1.PodSecurityContext
+
+	if roleGroup != nil && roleGroup.Config != nil && roleGroup.Config.Image != nil {
+		image = *roleGroup.Config.Image
+	} else {
+		image = *instance.Spec.Image
+	}
+
+	if roleGroup != nil && roleGroup.Config != nil && roleGroup.Config.SecurityContext != nil {
+		securityContext = roleGroup.Config.SecurityContext
+	} else {
+		securityContext = instance.Spec.SecurityContext
+	}
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.GetNameWithSuffix(roleGroupName),
@@ -396,12 +414,12 @@ func (r *SparkHistoryServerReconciler) makeDeploymentForRoleGroup(instance *stac
 					Labels: mergedLabels,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: instance.Spec.SecurityContext,
+					SecurityContext: securityContext,
 					Containers: []corev1.Container{
 						{
 							Name:            instance.Name,
-							Image:           instance.Spec.Image.Repository + ":" + instance.Spec.Image.Tag,
-							ImagePullPolicy: instance.Spec.Image.PullPolicy,
+							Image:           image.Repository + ":" + image.Tag,
+							ImagePullPolicy: image.PullPolicy,
 							Resources:       *roleGroup.Config.Resources,
 							Args: []string{
 								"/opt/bitnami/spark/sbin/start-history-server.sh",
