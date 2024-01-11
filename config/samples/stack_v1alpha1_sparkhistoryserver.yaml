@@ -41,7 +41,7 @@ spec:
             app: default
         ingress:
           enabled: false
-    foo:
+    large:
         replicas: 1
         config:
             resources:
