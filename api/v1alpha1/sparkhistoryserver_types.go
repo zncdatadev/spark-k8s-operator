@@ -26,79 +26,135 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+
+// SparkHistoryServer is the Schema for the sparkhistoryservers API
+type SparkHistoryServer struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
+	Status status.Status          `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// SparkHistoryServerList contains a list of SparkHistoryServer
+type SparkHistoryServerList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []SparkHistoryServer `json:"items"`
+}
+
 // SparkHistoryServerSpec defines the desired state of SparkHistoryServer
 type SparkHistoryServerSpec struct {
-	// +kubebuilder:validation:Required
-	Image *ImageSpec `json:"image"`
-
 	// +kubebuilder:validation:Optional
 	RoleConfig *RoleConfigSpec `json:"roleConfig"`
 
 	// +kubebuilder:validation:Optional
-	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups"`
+	RoleGroups map[string]*RoleConfigSpec `json:"roleGroups"`
+}
+
+type RoleConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=1
+	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Optional
-	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+	Config *ConfigSpec `json:"config"`
 
-	// +kubebuilder:validation:Required
-	Persistence *PersistenceSpec `json:"persistence"`
+	// +kubebuilder:validation:Optional
+	Image *ImageSpec `json:"image"`
 
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	Ingress *IngressSpec `json:"ingress"`
 
 	// +kubebuilder:validation:Optional
 	Service *ServiceSpec `json:"service"`
 
 	// +kubebuilder:validation:Optional
-	Labels map[string]string `json:"labels"`
+	History *HistorySpec `json:"history"`
 
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations"`
-}
-
-type RoleConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	EventLog *EventLogSpec `json:"eventLog"`
 
 	// +kubebuilder:validation:Optional
-	History *HistorySpec `json:"history"`
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector"`
+
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations *corev1.Toleration `json:"tolerations"`
+
+	// +kubebuilder:validation:Optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+
+	// +kubebuilder:validation:Optional
+	StorageClass *string `json:"storageClass,omitempty"`
+
+	// +kubebuilder:default="10Gi"
+	StorageSize string `json:"size,omitempty"`
+}
+
+type ConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	Resources *corev1.ResourceRequirements `json:"resources"`
 
 	// +kubebuilder:validation:Optional
 	S3 *S3Spec `json:"s3"`
 }
 
+type ImageSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="bitnami/spark"
+	Repository string `json:"repository,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="3.4.1"
+	Tag string `json:"tag,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=IfNotPresent
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+}
+
+type ServiceSpec struct {
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
+	// +kubebuilder:default=ClusterIP
+	Type corev1.ServiceType `json:"type,omitempty"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	// +kubebuilder:default=18080
+	Port int32 `json:"port"`
+}
+
+type IngressSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=true
+	Enabled bool `json:"enabled,omitempty"`
+	// +kubebuilder:validation:Optional
+	TLS *networkingv1.IngressTLS `json:"tls,omitempty"`
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:="spark-history-server.example.com"
+	Host string `json:"host,omitempty"`
+}
+
 type S3Spec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="http://bucket.example.com"
-	Endpoint string `json:"endpoint"`
+	S3BucketSpec `json:"bucket"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="us-east-1"
-	Region string `json:"region"`
+	// +kubebuilder:validation=Optional
+	PathStyleAccess bool `json:"pathStyle_access"`
+}
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
-	EnableSSL bool `json:"enableSSL"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="org.apache.hadoop.fs.s3a.S3AFileSystem"
-	Impl string `json:"impl"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	FastUpload bool `json:"fastUpload"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="accessKey"
-	AccessKey string `json:"accessKey"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="secret"
-	SecretKey string `json:"secretKey"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	PathStyleAccess bool `json:"pathStyleAccess"`
+type S3BucketSpec struct {
+	Reference string `json:"reference"`
 }
 
 type HistorySpec struct {
@@ -138,121 +194,13 @@ type EventLogSpec struct {
 	Enabled bool `json:"enabled,omitempty"`
 }
 
-type RoleGroupSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=1
-	Replicas int32 `json:"replicas"`
-
-	// +kubebuilder:validation:Optional
-	Config *ConfigRoleGroupSpec `json:"config"`
-}
-
-type ConfigRoleGroupSpec struct {
-	// +kubebuilder:validation:Optional
-	Image *ImageSpec `json:"image"`
-
-	// +kubebuilder:validation:Optional
-	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
-
-	// +kubebuilder:validation:Optional
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
-
-	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector"`
-
-	// +kubebuilder:validation:Optional
-	Tolerations *corev1.Toleration `json:"tolerations"`
-
-	// +kubebuilder:validation:Optional
-	Resources *corev1.ResourceRequirements `json:"resources"`
-
-	// +kubebuilder:validation:Optional
-	Ingress *IngressSpec `json:"ingress"`
-
-	// +kubebuilder:validation:Optional
-	Service *ServiceSpec `json:"service"`
-
-	// +kubebuilder:validation:Optional
-	Persistence *PersistenceSpec `json:"persistence"`
-
-	// +kubebuilder:validation:Optional
-	EventLog *EventLogSpec `json:"eventLog"`
-
-	// +kubebuilder:validation:Optional
-	History *HistorySpec `json:"history"`
-
-	// +kubebuilder:validation:Optional
-	S3 *S3Spec `json:"s3"`
+func init() {
+	SchemeBuilder.Register(&SparkHistoryServer{}, &SparkHistoryServerList{})
 }
 
 func (r *SparkHistoryServer) GetNameWithSuffix(suffix string) string {
 	// return sparkHistory.GetName() + rand.String(5) + suffix
 	return r.GetName() + "-" + suffix
-}
-
-type ImageSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="bitnami/spark"
-	Repository string `json:"repository,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="3.4.1"
-	Tag string `json:"tag,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=IfNotPresent
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
-}
-
-type PersistenceSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enable bool `json:"enable,omitempty"`
-	// +kubebuilder:validation:Optional
-	ExistingClaim *string `json:"existingClaim,omitempty"`
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="10Gi"
-	StorageSize string `json:"storageSize,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="ReadWriteOnce"
-	AccessMode string `json:"accessMode,omitempty"`
-	// +kubebuilder:validation:Optional
-	StorageClassName *string `json:"storageClassName,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=Filesystem
-	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty"`
-}
-
-func (p *PersistenceSpec) Existing() bool {
-	return p.ExistingClaim != nil
-}
-
-type IngressSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enabled bool `json:"enabled,omitempty"`
-	// +kubebuilder:validation:Optional
-	TLS *networkingv1.IngressTLS `json:"tls,omitempty"`
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="spark-history-server.example.com"
-	Host string `json:"host,omitempty"`
-}
-
-type ServiceSpec struct {
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
-	// +kubebuilder:default=ClusterIP
-	Type corev1.ServiceType `json:"type,omitempty"`
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=18080
-	Port int32 `json:"port"`
 }
 
 // SetStatusCondition updates the status condition using the provided arguments.
@@ -266,29 +214,4 @@ func (r *SparkHistoryServer) SetStatusCondition(condition metav1.Condition) {
 func (r *SparkHistoryServer) InitStatusConditions() {
 	r.Status.InitStatus(r)
 	r.Status.InitStatusConditions()
-}
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
-// SparkHistoryServer is the Schema for the sparkhistoryservers API
-type SparkHistoryServer struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
-	Status status.Status          `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// SparkHistoryServerList contains a list of SparkHistoryServer
-type SparkHistoryServerList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []SparkHistoryServer `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&SparkHistoryServer{}, &SparkHistoryServerList{})
 }
