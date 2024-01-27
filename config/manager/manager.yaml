@@ -19,7 +19,6 @@ metadata:
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: spark-k8s-operator
-
     app.kubernetes.io/instance: spark-k8s-operator
     app.kubernetes.io/component: manager
     app.kubernetes.io/created-by: operator-lifecycle-manager
