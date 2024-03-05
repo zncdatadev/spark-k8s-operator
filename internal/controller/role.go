@@ -2,30 +2,31 @@ package controller
 
 import (
 	"context"
+	"strings"
+
 	"github.com/go-logr/logr"
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 // roleMaster reconciler
 
 type SparkHistoryServer struct {
-	common.BaseRoleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleSpec]
+	common.BaseRoleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleSpec]
 }
 
 // NewSparkHistoryServer  new roleMaster
 func NewSparkHistoryServer(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	log logr.Logger) *SparkHistoryServer {
 	r := &SparkHistoryServer{
-		BaseRoleReconciler: common.BaseRoleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleSpec]{
+		BaseRoleReconciler: common.BaseRoleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleSpec]{
 			Scheme:   scheme,
 			Instance: instance,
 			Client:   client,
@@ -47,7 +48,7 @@ func (r *SparkHistoryServer) MergeLabels() map[string]string {
 
 func (r *SparkHistoryServer) ReconcileRole(ctx context.Context) (ctrl.Result, error) {
 	if r.Role.Config != nil && r.Role.Config.PodDisruptionBudget != nil {
-		pdb := common.NewReconcilePDB[*stackv1alpha1.SparkHistoryServer](
+		pdb := common.NewReconcilePDB[*sparkv1alpha1.SparkHistoryServer](
 			r.Client,
 			r.Scheme,
 			r.Instance,
@@ -79,7 +80,7 @@ func (r *SparkHistoryServer) ReconcileRole(ctx context.Context) (ctrl.Result, er
 // RoleMasterGroup master role group reconcile
 type RoleMasterGroup struct {
 	Scheme     *runtime.Scheme
-	Instance   *stackv1alpha1.SparkHistoryServer
+	Instance   *sparkv1alpha1.SparkHistoryServer
 	Client     client.Client
 	GroupName  string
 	RoleLabels map[string]string
@@ -88,7 +89,7 @@ type RoleMasterGroup struct {
 
 func NewRoleMasterGroup(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	groupName string,
 	roleLabels map[string]string,
@@ -108,14 +109,14 @@ func NewRoleMasterGroup(
 func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, error) {
 	//reconcile all resources below
 
-	//convert any to *stackv1alpha1.MasterRoleGroupSpec
+	//convert any to *sparkv1alpha1.MasterRoleGroupSpec
 	mergedCfgObj := r.MergeGroupConfigSpec()
-	mergedGroupCfg := mergedCfgObj.(*stackv1alpha1.RoleGroupSpec)
+	mergedGroupCfg := mergedCfgObj.(*sparkv1alpha1.RoleGroupSpec)
 
 	mergedLabels := r.MergeLabels(mergedGroupCfg)
 	//pdb
 	if mergedGroupCfg.Config != nil && mergedGroupCfg.Config.PodDisruptionBudget != nil {
-		pdb := common.NewReconcilePDB[*stackv1alpha1.SparkHistoryServer](
+		pdb := common.NewReconcilePDB[*sparkv1alpha1.SparkHistoryServer](
 			r.Client,
 			r.Scheme,
 			r.Instance,
@@ -196,7 +197,7 @@ func (r *RoleMasterGroup) MergeGroupConfigSpec() any {
 }
 
 func (r *RoleMasterGroup) MergeLabels(mergedCfg any) map[string]string {
-	mergedMasterCfg := mergedCfg.(*stackv1alpha1.RoleGroupSpec)
+	mergedMasterCfg := mergedCfg.(*sparkv1alpha1.RoleGroupSpec)
 	roleLabels := r.RoleLabels
 	mergeLabels := make(util.Map)
 	mergeLabels.MapMerge(roleLabels, true)
@@ -207,8 +208,8 @@ func (r *RoleMasterGroup) MergeLabels(mergedCfg any) map[string]string {
 
 // mergeConfig merge the role's config into the role group's config
 func mergeConfig(
-	masterRole *stackv1alpha1.RoleSpec,
-	group *stackv1alpha1.RoleGroupSpec) *stackv1alpha1.RoleGroupSpec {
+	masterRole *sparkv1alpha1.RoleSpec,
+	group *sparkv1alpha1.RoleGroupSpec) *sparkv1alpha1.RoleGroupSpec {
 	copiedRoleGroup := group.DeepCopy()
 	// Merge the role into the role group.
 	// if the role group has a config, and role group not has a config, will
@@ -223,5 +224,5 @@ func mergeConfig(
 }
 
 //type LogDataBuilder struct {
-//	cfg *stackv1alpha1.RoleGroupSpec
+//	cfg *sparkv1alpha1.RoleGroupSpec
 //}

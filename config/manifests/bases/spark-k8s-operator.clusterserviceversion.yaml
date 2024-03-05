@@ -16,7 +16,7 @@ spec:
     - description: SparkHistoryServer is the Schema for the sparkhistoryservers API
       displayName: Spark History Server
       kind: SparkHistoryServer
-      name: sparkhistoryservers.stack.zncdata.net
+      name: sparkhistoryservers.spark.zncdata.dev
       version: v1alpha1
   description: spark for k8s operator
   displayName: spark-k8s-operator

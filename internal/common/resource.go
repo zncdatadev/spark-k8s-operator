@@ -2,7 +2,8 @@ package common
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,5 +33,5 @@ func (r *ResourceClient) Get(obj client.Object) error {
 }
 
 type InstanceAttributes interface {
-	GetClusterConfig() *stackv1alpha1.ClusterConfigSpec
+	GetClusterConfig() *sparkv1alpha1.ClusterConfigSpec
 }

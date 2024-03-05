@@ -2,7 +2,8 @@ package common
 
 import (
 	"context"
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,7 +15,7 @@ type PDBReconciler[T client.Object] struct {
 	BaseResourceReconciler[T, any]
 	name   string
 	labels map[string]string
-	pdb    *stackv1alpha1.PodDisruptionBudgetSpec
+	pdb    *sparkv1alpha1.PodDisruptionBudgetSpec
 }
 
 func NewReconcilePDB[T client.Object](
@@ -23,9 +24,9 @@ func NewReconcilePDB[T client.Object](
 	cr T,
 	labels map[string]string,
 	name string,
-	pdb *stackv1alpha1.PodDisruptionBudgetSpec,
+	pdb *sparkv1alpha1.PodDisruptionBudgetSpec,
 ) *PDBReconciler[T] {
-	var cfg = &stackv1alpha1.RoleGroupSpec{}
+	var cfg = &sparkv1alpha1.RoleGroupSpec{}
 	return &PDBReconciler[T]{
 		BaseResourceReconciler: *NewBaseResourceReconciler[T, any](
 			schema,

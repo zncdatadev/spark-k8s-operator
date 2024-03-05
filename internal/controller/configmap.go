@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,20 +13,21 @@ import (
 )
 
 type ConfigMapReconciler struct {
-	common.ConfigurationStyleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleGroupSpec]
+	common.ConfigurationStyleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleGroupSpec]
 }
 
 // NewConfigMap new a ConfigMapReconcile
 func NewConfigMap(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	groupName string,
 	mergedLabels map[string]string,
-	mergedCfg *stackv1alpha1.RoleGroupSpec,
+	mergedCfg *sparkv1alpha1.RoleGroupSpec,
 ) *ConfigMapReconciler {
 	return &ConfigMapReconciler{
-		ConfigurationStyleReconciler: *common.NewConfigurationStyleReconciler(
+		ConfigurationStyleReconciler: *common.NewConfigurationStyleReconciler[*sparkv1alpha1.SparkHistoryServer,
+			*sparkv1alpha1.RoleGroupSpec](
 			scheme,
 			instance,
 			client,
