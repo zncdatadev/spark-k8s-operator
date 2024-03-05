@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,21 +12,22 @@ import (
 )
 
 type ServiceReconciler struct {
-	common.GeneralResourceStyleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleGroupSpec]
+	common.GeneralResourceStyleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleGroupSpec]
 }
 
 // NewService new a ServiceReconcile
 func NewService(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	groupName string,
 	mergedLabels map[string]string,
-	mergedCfg *stackv1alpha1.RoleGroupSpec,
+	mergedCfg *sparkv1alpha1.RoleGroupSpec,
 
 ) *ServiceReconciler {
 	return &ServiceReconciler{
-		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler(
+		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler[*sparkv1alpha1.SparkHistoryServer,
+			*sparkv1alpha1.RoleGroupSpec](
 			scheme,
 			instance,
 			client,
@@ -65,6 +66,6 @@ func (s *ServiceReconciler) Build(_ context.Context) (client.Object, error) {
 }
 
 // get service spec
-func (s *ServiceReconciler) getServiceSpec() *stackv1alpha1.ListenerSpec {
+func (s *ServiceReconciler) getServiceSpec() *sparkv1alpha1.ListenerSpec {
 	return getServiceSpec(s.Instance)
 }

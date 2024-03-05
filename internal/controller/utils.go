@@ -1,7 +1,7 @@
 package controller
 
 import (
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 )
 
@@ -29,10 +29,10 @@ func createIngName(instanceName string, groupName string) string {
 	return common.NewResourceNameGenerator(instanceName, "", groupName).GenerateResourceName("")
 }
 
-func getServiceSpec(instance *stackv1alpha1.SparkHistoryServer) *stackv1alpha1.ListenerSpec {
+func getServiceSpec(instance *sparkv1alpha1.SparkHistoryServer) *sparkv1alpha1.ListenerSpec {
 	spec := instance.Spec.ClusterConfig.Listener
 	if spec == nil {
-		spec = &stackv1alpha1.ListenerSpec{
+		spec = &sparkv1alpha1.ListenerSpec{
 			Type: "ClusterIP",
 			Port: 9083,
 		}

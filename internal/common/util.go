@@ -1,7 +1,7 @@
 package common
 
 import (
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -65,7 +65,7 @@ func GetStorageClass(origin string) *string {
 	}
 	return &origin
 }
-func ConvertToResourceRequirements(resources *stackv1alpha1.ResourcesSpec) *corev1.ResourceRequirements {
+func ConvertToResourceRequirements(resources *sparkv1alpha1.ResourcesSpec) *corev1.ResourceRequirements {
 	var (
 		cpuMin      = resource.MustParse("100m")
 		cpuMax      = resource.MustParse("500")

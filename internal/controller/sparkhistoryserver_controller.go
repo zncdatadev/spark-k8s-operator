@@ -18,8 +18,9 @@ package controller
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,9 +33,9 @@ type SparkHistoryServerReconciler struct {
 	Log    logr.Logger
 }
 
-//+kubebuilder:rbac:groups=stack.zncdata.net,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=stack.zncdata.net,resources=sparkhistoryservers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=stack.zncdata.net,resources=sparkhistoryservers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -55,7 +56,7 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	r.Log.Info("Reconciling SparkHistory")
 
-	sparkHistory := &stackv1alpha1.SparkHistoryServer{}
+	sparkHistory := &sparkv1alpha1.SparkHistoryServer{}
 
 	if err := r.Get(ctx, req.NamespacedName, sparkHistory); err != nil {
 		if client.IgnoreNotFound(err) != nil {
@@ -78,14 +79,14 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 // SetupWithManager sets up the controller with the Manager.
 func (r *SparkHistoryServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&stackv1alpha1.SparkHistoryServer{}).
+		For(&sparkv1alpha1.SparkHistoryServer{}).
 		Complete(r)
 }
 
 type SparkHistoryInstance struct {
-	Instance *stackv1alpha1.SparkHistoryServer
+	Instance *sparkv1alpha1.SparkHistoryServer
 }
 
-func (i *SparkHistoryInstance) GetClusterConfig() *stackv1alpha1.ClusterConfigSpec {
+func (i *SparkHistoryInstance) GetClusterConfig() *sparkv1alpha1.ClusterConfigSpec {
 	return i.Instance.Spec.ClusterConfig
 }

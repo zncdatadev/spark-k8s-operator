@@ -2,8 +2,7 @@ package controller
 
 import (
 	"context"
-
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -13,20 +12,21 @@ import (
 )
 
 type PvcReconciler struct {
-	common.GeneralResourceStyleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleGroupSpec]
+	common.GeneralResourceStyleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleGroupSpec]
 }
 
 // NewPvc new a PvcReconcile
 func NewPvc(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	groupName string,
 	mergedLabels map[string]string,
-	mergedCfg *stackv1alpha1.RoleGroupSpec,
+	mergedCfg *sparkv1alpha1.RoleGroupSpec,
 ) *PvcReconciler {
 	return &PvcReconciler{
-		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler(
+		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler[*sparkv1alpha1.SparkHistoryServer,
+			*sparkv1alpha1.RoleGroupSpec](
 			scheme,
 			instance,
 			client,

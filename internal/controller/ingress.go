@@ -2,8 +2,7 @@ package controller
 
 import (
 	"context"
-
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	v1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,19 +11,20 @@ import (
 )
 
 type IngressReconciler struct {
-	common.GeneralResourceStyleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleGroupSpec]
+	common.GeneralResourceStyleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleGroupSpec]
 }
 
 func NewIngress(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	groupName string,
 	mergedLabels map[string]string,
-	mergedCfg *stackv1alpha1.RoleGroupSpec,
+	mergedCfg *sparkv1alpha1.RoleGroupSpec,
 ) *IngressReconciler {
 	return &IngressReconciler{
-		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler(
+		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler[*sparkv1alpha1.SparkHistoryServer,
+			*sparkv1alpha1.RoleGroupSpec](
 			scheme,
 			instance,
 			client,
@@ -74,10 +74,10 @@ func (i *IngressReconciler) Build(_ context.Context) (client.Object, error) {
 }
 
 // get ingress spec
-func (i *IngressReconciler) getIngressSpec() *stackv1alpha1.IngressSpec {
+func (i *IngressReconciler) getIngressSpec() *sparkv1alpha1.IngressSpec {
 	spec := i.Instance.Spec.ClusterConfig.Ingress
 	if spec == nil {
-		spec = &stackv1alpha1.IngressSpec{
+		spec = &sparkv1alpha1.IngressSpec{
 			Host:    "spark-history-server.example.com",
 			Enabled: true,
 		}

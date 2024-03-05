@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"github.com/go-logr/logr"
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -19,14 +19,14 @@ func RegisterRole(role common.Role, roleReconciler common.RoleReconciler) {
 type ClusterReconciler struct {
 	client client.Client
 	scheme *runtime.Scheme
-	cr     *stackv1alpha1.SparkHistoryServer
+	cr     *sparkv1alpha1.SparkHistoryServer
 	Log    logr.Logger
 }
 
 func NewClusterReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
-	cr *stackv1alpha1.SparkHistoryServer) *ClusterReconciler {
+	cr *sparkv1alpha1.SparkHistoryServer) *ClusterReconciler {
 	return &ClusterReconciler{
 		client: client,
 		scheme: scheme,

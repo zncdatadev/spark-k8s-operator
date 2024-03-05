@@ -2,8 +2,7 @@ package controller
 
 import (
 	"context"
-
-	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,22 +12,23 @@ import (
 )
 
 type DeploymentReconciler struct {
-	common.DeploymentStyleReconciler[*stackv1alpha1.SparkHistoryServer, *stackv1alpha1.RoleGroupSpec]
+	common.DeploymentStyleReconciler[*sparkv1alpha1.SparkHistoryServer, *sparkv1alpha1.RoleGroupSpec]
 }
 
 // NewDeployment new a DeploymentReconcile
 func NewDeployment(
 	scheme *runtime.Scheme,
-	instance *stackv1alpha1.SparkHistoryServer,
+	instance *sparkv1alpha1.SparkHistoryServer,
 	client client.Client,
 	groupName string,
 	mergedLabels map[string]string,
-	mergedCfg *stackv1alpha1.RoleGroupSpec,
+	mergedCfg *sparkv1alpha1.RoleGroupSpec,
 	replicates int32,
 
 ) *DeploymentReconciler {
 	return &DeploymentReconciler{
-		DeploymentStyleReconciler: *common.NewDeploymentStyleReconciler(
+		DeploymentStyleReconciler: *common.NewDeploymentStyleReconciler[*sparkv1alpha1.SparkHistoryServer,
+			*sparkv1alpha1.RoleGroupSpec](
 			scheme,
 			instance,
 			client,
@@ -155,7 +155,7 @@ func (d *DeploymentReconciler) createVolumes() []corev1.Volume {
 	}
 }
 
-func (d *DeploymentReconciler) getImageSpec() *stackv1alpha1.ImageSpec {
+func (d *DeploymentReconciler) getImageSpec() *sparkv1alpha1.ImageSpec {
 	return d.Instance.Spec.Image
 }
 
