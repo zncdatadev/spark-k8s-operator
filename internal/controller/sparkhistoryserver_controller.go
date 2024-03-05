@@ -19,11 +19,7 @@ package controller
 import (
 	"context"
 	"github.com/go-logr/logr"
-	"github.com/zncdata-labs/operator-go/pkg/status"
-	"github.com/zncdata-labs/operator-go/pkg/util"
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,74 +66,13 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	// Get the status condition, if it exists and its generation is not the
-	//same as the SparkHistoryServer's generation, reset the status conditions
-	readCondition := apimeta.FindStatusCondition(sparkHistory.Status.Conditions, status.ConditionTypeProgressing)
-	if readCondition == nil || readCondition.ObservedGeneration != sparkHistory.GetGeneration() {
-		sparkHistory.InitStatusConditions()
-
-		if err := util.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
-			r.Log.Error(err, "unable to update SparkHistoryServer status")
-			return ctrl.Result{}, err
-		}
-	}
-
 	r.Log.Info("SparkHistoryServer found", "Name", sparkHistory.Name)
-
-	tasks := []ReconcileTask[*stackv1alpha1.SparkHistoryServer]{
-		{
-			resourceName:  ConfigMap,
-			reconcileFunc: r.reconcileConfigMap,
-		},
-		{
-			resourceName:  Secret,
-			reconcileFunc: r.reconcileSecret,
-		},
-		{
-			resourceName:  Pvc,
-			reconcileFunc: r.reconcilePVC,
-		},
-		{
-			resourceName:  Deployment,
-			reconcileFunc: r.reconcileDeployment,
-		},
-		{
-			resourceName:  Service,
-			reconcileFunc: r.reconcileService,
-		}, {
-			resourceName:  Ingress,
-			reconcileFunc: r.reconcileIngress,
-		},
-	}
-	reconcileParams := TaskReconcilePara[*stackv1alpha1.SparkHistoryServer]{
-		ctx:            ctx,
-		instance:       sparkHistory,
-		log:            r.Log,
-		client:         r.Client,
-		instanceStatus: &sparkHistory.Status,
-		serverName:     "sparkHistoryServer",
-	}
-	if err := ReconcileTasks(&tasks, reconcileParams); err != nil {
+	result, err := NewClusterReconciler(r.Client, r.Scheme, sparkHistory).ReconcileCluster(ctx)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
-
-	if !sparkHistory.Status.IsAvailable() {
-		sparkHistory.SetStatusCondition(metav1.Condition{
-			Type:               status.ConditionTypeAvailable,
-			Status:             metav1.ConditionTrue,
-			Reason:             status.ConditionReasonRunning,
-			Message:            "SparkHistoryServer is running",
-			ObservedGeneration: sparkHistory.GetGeneration(),
-		})
-
-		if err := util.UpdateStatus(ctx, r.Client, sparkHistory); err != nil {
-			r.Log.Error(err, "unable to update SparkHistoryServer status")
-			return ctrl.Result{}, err
-		}
-	}
-
 	r.Log.Info("Successfully reconciled SparkHistoryServer")
-	return ctrl.Result{}, nil
+	return result, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -145,4 +80,12 @@ func (r *SparkHistoryServerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&stackv1alpha1.SparkHistoryServer{}).
 		Complete(r)
+}
+
+type SparkHistoryInstance struct {
+	Instance *stackv1alpha1.SparkHistoryServer
+}
+
+func (i *SparkHistoryInstance) GetClusterConfig() *stackv1alpha1.ClusterConfigSpec {
+	return i.Instance.Spec.ClusterConfig
 }
