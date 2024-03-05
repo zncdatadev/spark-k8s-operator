@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
@@ -25,8 +26,7 @@ func NewConfigMap(
 	mergedCfg *stackv1alpha1.RoleGroupSpec,
 ) *ConfigMapReconciler {
 	return &ConfigMapReconciler{
-		ConfigurationStyleReconciler: *common.NewConfigurationStyleReconciler[*stackv1alpha1.SparkHistoryServer,
-			*stackv1alpha1.RoleGroupSpec](
+		ConfigurationStyleReconciler: *common.NewConfigurationStyleReconciler(
 			scheme,
 			instance,
 			client,
@@ -79,15 +79,11 @@ func (c *ConfigMapReconciler) makeSparkConfigData(ctx context.Context) (*string,
 	}
 	//make event log data
 	if eventLogCfg := c.makeEventLogConfig(); eventLogCfg != nil {
-		if eventLogCfg != nil {
-			cfgContent += *eventLogCfg
-		}
+		cfgContent += *eventLogCfg
 	}
 	// make history data
 	if historyCfg := c.makeHistoryConfig(); historyCfg != nil {
-		if historyCfg != nil {
-			cfgContent += *historyCfg
-		}
+		cfgContent += *historyCfg
 	}
 	return &cfgContent, nil
 }
