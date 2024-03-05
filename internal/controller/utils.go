@@ -32,8 +32,10 @@ func createIngName(instanceName string, groupName string) string {
 func getServiceSpec(instance *stackv1alpha1.SparkHistoryServer) *stackv1alpha1.ListenerSpec {
 	spec := instance.Spec.ClusterConfig.Listener
 	if spec == nil {
-		spec.Type = "ClusterIP"
-		spec.Port = 9083
+		spec = &stackv1alpha1.ListenerSpec{
+			Type: "ClusterIP",
+			Port: 9083,
+		}
 	}
 	return spec
 }

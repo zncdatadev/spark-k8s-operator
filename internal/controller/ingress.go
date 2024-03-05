@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	v1 "k8s.io/api/networking/v1"
@@ -23,8 +24,7 @@ func NewIngress(
 	mergedCfg *stackv1alpha1.RoleGroupSpec,
 ) *IngressReconciler {
 	return &IngressReconciler{
-		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler[*stackv1alpha1.SparkHistoryServer,
-			*stackv1alpha1.RoleGroupSpec](
+		GeneralResourceStyleReconciler: *common.NewGeneraResourceStyleReconciler(
 			scheme,
 			instance,
 			client,
@@ -77,8 +77,10 @@ func (i *IngressReconciler) Build(_ context.Context) (client.Object, error) {
 func (i *IngressReconciler) getIngressSpec() *stackv1alpha1.IngressSpec {
 	spec := i.Instance.Spec.ClusterConfig.Ingress
 	if spec == nil {
-		spec.Host = "spark-history-server.example.com"
-		spec.Enabled = true
+		spec = &stackv1alpha1.IngressSpec{
+			Host:    "spark-history-server.example.com",
+			Enabled: true,
+		}
 	}
 	return spec
 }

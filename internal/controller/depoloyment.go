@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+
 	stackv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,8 +28,7 @@ func NewDeployment(
 
 ) *DeploymentReconciler {
 	return &DeploymentReconciler{
-		DeploymentStyleReconciler: *common.NewDeploymentStyleReconciler[*stackv1alpha1.SparkHistoryServer,
-			*stackv1alpha1.RoleGroupSpec](
+		DeploymentStyleReconciler: *common.NewDeploymentStyleReconciler(
 			scheme,
 			instance,
 			client,
