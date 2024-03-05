@@ -70,6 +70,18 @@ func (c *ConfigMapReconciler) ConfigurationOverride(resource client.Object) {
 	}
 }
 
+// make spark-defaults.conf file content
+func (c *ConfigMapReconciler) makeSparkConfigContent(override map[string]string) *string {
+	if override != nil {
+		var content string
+		for k, v := range override {
+			content += fmt.Sprintf("%s %s\n", k, v)
+		}
+		return &content
+	}
+	return nil
+}
+
 func (c *ConfigMapReconciler) makeSparkConfigData(ctx context.Context) (*string, error) {
 	var cfgContent string
 	// make s3 config data
