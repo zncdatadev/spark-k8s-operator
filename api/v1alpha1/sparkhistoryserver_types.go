@@ -103,7 +103,7 @@ type RoleSpec struct {
 }
 
 type ConfigOverridesSpec struct {
-	HiveSite map[string]string `json:"hive-site.xml,omitempty"`
+	SparkConfig map[string]string `json:"spark-defaults.conf,omitempty"`
 }
 
 type ConfigSpec struct {

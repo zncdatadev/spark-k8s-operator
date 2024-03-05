@@ -34,11 +34,3 @@ func (r *ResourceClient) Get(obj client.Object) error {
 type InstanceAttributes interface {
 	GetClusterConfig() *stackv1alpha1.ClusterConfigSpec
 }
-
-type SparkHistoryInstance struct {
-	Instance *stackv1alpha1.SparkHistoryServer
-}
-
-func (i *SparkHistoryInstance) GetClusterConfig() *stackv1alpha1.ClusterConfigSpec {
-	return i.Instance.Spec.ClusterConfig
-}

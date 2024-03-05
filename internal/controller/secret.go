@@ -54,9 +54,25 @@ func (s *SecretReconciler) Build(ctx context.Context) (client.Object, error) {
 	}
 }
 
+// ConfigurationOverride implement the ConfigurationOverride interface
+func (s *SecretReconciler) ConfigurationOverride(resource client.Object) {
+	cfg := s.MergedCfg
+	overrides := cfg.ConfigOverrides
+	if overrides != nil {
+		configMap := resource.(*corev1.Secret)
+		data := &configMap.Data
+		for k, v := range overrides.SparkConfig {
+			(*data)[k] = []byte(v)
+		}
+	}
+}
+
 // makeSparkSecretData creates the secret data
 func (s *SecretReconciler) makeSparkSecretData(ctx context.Context) (map[string][]byte, error) {
 	s3Cfg := s.createS3Configuration(ctx)
+	if !s3Cfg.Enabled() {
+		return nil, nil
+	}
 	var params *common.S3Params
 	var err error
 	if !s3Cfg.ExistingS3Bucket() {
@@ -75,7 +91,7 @@ func (s *SecretReconciler) createS3Configuration(
 	cr := s.Instance
 	// create s3 configuration
 	return common.NewS3Configuration(
-		&common.SparkHistoryInstance{Instance: cr},
+		&SparkHistoryInstance{Instance: cr},
 		common.ResourceClient{
 			Ctx:       ctx,
 			Client:    s.Client,

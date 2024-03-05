@@ -173,6 +173,9 @@ func (s *ConfigurationStyleReconciler[T, G]) DoReconcile(
 	resource client.Object,
 	instance ResourceHandler,
 ) (ctrl.Result, error) {
+	if resource == nil {
+		return ctrl.Result{}, nil
+	}
 	if override, ok := instance.(ConfigurationOverride); ok {
 		override.ConfigurationOverride(resource)
 	} else {

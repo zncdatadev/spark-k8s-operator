@@ -84,7 +84,7 @@ func (i *IngressReconciler) getIngressSpec() *stackv1alpha1.IngressSpec {
 }
 
 // get service port
-func (s *IngressReconciler) getServicePort() int32 {
-	svcSpec := getServiceSpec(s.Instance)
+func (i *IngressReconciler) getServicePort() int32 {
+	svcSpec := getServiceSpec(i.Instance)
 	return svcSpec.Port
 }

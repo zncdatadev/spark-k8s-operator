@@ -1620,7 +1620,7 @@ spec:
                     type: object
                   configOverrides:
                     properties:
-                      hive-site.xml:
+                      spark-defaults.conf:
                         additionalProperties:
                           type: string
                         type: object
@@ -3247,7 +3247,7 @@ spec:
                           type: object
                         configOverrides:
                           properties:
-                            hive-site.xml:
+                            spark-defaults.conf:
                               additionalProperties:
                                 type: string
                               type: object

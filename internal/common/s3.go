@@ -95,6 +95,10 @@ func (s *S3Configuration[T]) GetCredential(name string) (*S3Credential, error) {
 	}, nil
 }
 
+func (s *S3Configuration[T]) Enabled() bool {
+	clusterCfg := s.InstanceAttributes.GetClusterConfig()
+	return clusterCfg != nil && clusterCfg.S3Bucket != nil
+}
 func (s *S3Configuration[T]) ExistingS3Bucket() bool {
 	return s.InstanceAttributes.GetClusterConfig().S3Bucket.Reference != nil
 }

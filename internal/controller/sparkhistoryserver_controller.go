@@ -81,3 +81,11 @@ func (r *SparkHistoryServerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		For(&stackv1alpha1.SparkHistoryServer{}).
 		Complete(r)
 }
+
+type SparkHistoryInstance struct {
+	Instance *stackv1alpha1.SparkHistoryServer
+}
+
+func (i *SparkHistoryInstance) GetClusterConfig() *stackv1alpha1.ClusterConfigSpec {
+	return i.Instance.Spec.ClusterConfig
+}

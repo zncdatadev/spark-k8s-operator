@@ -75,6 +75,21 @@ func (d *DeploymentReconciler) Build(ctx context.Context) (client.Object, error)
 	return dep, nil
 }
 
+// CommandOverride implement the WorkloadOverride interface
+func (d *DeploymentReconciler) CommandOverride(resource client.Object) {
+
+}
+
+// EnvOverride implement the WorkloadOverride interface
+func (d *DeploymentReconciler) EnvOverride(resource client.Object) {
+
+}
+
+// LogOverride implement the WorkloadOverride interface
+func (d *DeploymentReconciler) LogOverride(resource client.Object) {
+
+}
+
 // create container
 func (d *DeploymentReconciler) createContainer() corev1.Container {
 	image := d.getImageSpec()

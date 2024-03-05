@@ -56,21 +56,38 @@ func (c *ConfigMapReconciler) Build(ctx context.Context) (client.Object, error) 
 	}
 }
 
+// ConfigurationOverride implement the ConfigurationOverride interface
+func (c *ConfigMapReconciler) ConfigurationOverride(resource client.Object) {
+	cfg := c.MergedCfg
+	overrides := cfg.ConfigOverrides
+	if overrides != nil {
+		configMap := resource.(*corev1.ConfigMap)
+		data := &configMap.Data
+		for k, v := range overrides.SparkConfig {
+			(*data)[k] = v
+		}
+	}
+}
+
 func (c *ConfigMapReconciler) makeSparkConfigData(ctx context.Context) (*string, error) {
 	var cfgContent string
 	// make s3 config data
 	if s3Cfg, err := c.makeS3Config(ctx); err != nil {
 		return nil, err
-	} else {
+	} else if s3Cfg != nil {
 		cfgContent += *s3Cfg
 	}
 	//make event log data
 	if eventLogCfg := c.makeEventLogConfig(); eventLogCfg != nil {
-		cfgContent += *eventLogCfg
+		if eventLogCfg != nil {
+			cfgContent += *eventLogCfg
+		}
 	}
 	// make history data
 	if historyCfg := c.makeHistoryConfig(); historyCfg != nil {
-		cfgContent += *historyCfg
+		if historyCfg != nil {
+			cfgContent += *historyCfg
+		}
 	}
 	return &cfgContent, nil
 }
@@ -85,6 +102,9 @@ spark.hadoop.fs.s3a.path.style.access %t
 
 func (c *ConfigMapReconciler) makeS3Config(ctx context.Context) (*string, error) {
 	s3Cfg := c.createS3Configuration(ctx)
+	if !s3Cfg.Enabled() {
+		return nil, nil
+	}
 	var params *common.S3Params
 	var err error
 	if !s3Cfg.ExistingS3Bucket() {
@@ -104,7 +124,7 @@ func (c *ConfigMapReconciler) createS3Configuration(
 	cr := c.Instance
 	// create s3 configuration
 	return common.NewS3Configuration(
-		&common.SparkHistoryInstance{Instance: cr},
+		&SparkHistoryInstance{Instance: cr},
 		common.ResourceClient{
 			Ctx:       ctx,
 			Client:    c.Client,
