@@ -49,30 +49,86 @@ type SparkHistoryServerList struct {
 
 // SparkHistoryServerSpec defines the desired state of SparkHistoryServer
 type SparkHistoryServerSpec struct {
-	// +kubebuilder:validation:Optional
-	RoleConfig *RoleConfigSpec `json:"roleConfig"`
+	//+kubebuilder:validation:Optional
+	Image *ImageSpec `json:"image,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	RoleGroups map[string]*RoleConfigSpec `json:"roleGroups"`
+	ClusterConfig *ClusterConfigSpec `json:"clusterConfig,omitempty"`
+
+	// +kubebuilder:validation:Required
+	SparkHistory *RoleSpec `json:"sparkHistory"`
 }
 
-type RoleConfigSpec struct {
+type ClusterConfigSpec struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=1
-	Replicas int32 `json:"replicas"`
+	S3Bucket *S3BucketSpec `json:"s3Bucket,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Config *ConfigSpec `json:"config"`
+	Listener *ListenerSpec `json:"listener,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Image *ImageSpec `json:"image"`
+	Ingress *IngressSpec `json:"ingress,omitempty"`
+}
+
+type ImageSpec struct {
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=docker.io/apache/hive
+	Repository string `json:"repository,omitempty"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default="4.0.0-beta-1"
+	Tag string `json:"tag,omitempty"`
+
+	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
+	// +kubebuilder:default=IfNotPresent
+	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+}
+type RoleSpec struct {
 
 	// +kubebuilder:validation:Optional
-	Ingress *IngressSpec `json:"ingress"`
+	Config *ConfigSpec `json:"config,omitempty"`
+
+	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
+
+	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Service *ServiceSpec `json:"service"`
+	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
+	// +kubebuilder:validation:Optional
+	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
+	// +kubebuilder:validation:Optional
+	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
+	//// +kubebuilder:validation:Optional
+	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
+}
 
+type ConfigOverridesSpec struct {
+	HiveSite map[string]string `json:"hive-site.xml,omitempty"`
+}
+
+type ConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	Resources *ResourcesSpec `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
+
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity"`
+
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Tolerations []corev1.Toleration `json:"tolerations"`
+
+	// +kubebuilder:validation:Optional
+	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	StorageClass string `json:"storageClass,omitempty"`
+	// +kubebuilder:default="10Gi"
+	StorageSize string `json:"size,omitempty"`
 	// +kubebuilder:validation:Optional
 	History *HistorySpec `json:"history"`
 
@@ -80,57 +136,46 @@ type RoleConfigSpec struct {
 	EventLog *EventLogSpec `json:"eventLog"`
 
 	// +kubebuilder:validation:Optional
-	MatchLabels map[string]string `json:"matchLabels,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector"`
-
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
-
-	// +kubebuilder:validation:Optional
-	Tolerations *corev1.Toleration `json:"tolerations"`
-
-	// +kubebuilder:validation:Optional
-	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
-
-	// +kubebuilder:validation:Optional
-	StorageClass *string `json:"storageClass,omitempty"`
-
-	// +kubebuilder:default="10Gi"
-	StorageSize string `json:"size,omitempty"`
+	Logging *ContainerLoggingSpec `json:"logging,omitempty"`
 }
 
-type ConfigSpec struct {
+type PodDisruptionBudgetSpec struct {
 	// +kubebuilder:validation:Optional
-	Resources *corev1.ResourceRequirements `json:"resources"`
+	MinAvailable int32 `json:"minAvailable,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	S3 *S3Spec `json:"s3"`
+	MaxUnavailable int32 `json:"maxUnavailable,omitempty"`
 }
 
-type ImageSpec struct {
+type RoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="bitnami/spark"
-	Repository string `json:"repository,omitempty"`
+	// +kubebuilder:default:=1
+	Replicas int32 `json:"replicas,omitempty"`
+
+	Config *ConfigSpec `json:"config,omitempty"`
+
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="3.4.1"
-	Tag string `json:"tag,omitempty"`
+	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=IfNotPresent
-	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
+	// +kubebuilder:validation:Optional
+	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
+	//// +kubebuilder:validation:Optional
+	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
 }
 
-type ServiceSpec struct {
+type ListenerSpec struct {
 	// +kubebuilder:validation:Optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
 	// +kubebuilder:default=ClusterIP
 	Type corev1.ServiceType `json:"type,omitempty"`
+
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=18080
-	Port int32 `json:"port"`
+	// +kubebuilder:default=9083
+	Port int32 `json:"port,omitempty"`
 }
 
 type IngressSpec struct {
@@ -146,15 +191,47 @@ type IngressSpec struct {
 	Host string `json:"host,omitempty"`
 }
 
-type S3Spec struct {
-	S3BucketSpec `json:"bucket"`
+type S3BucketSpec struct {
+	// S3 bucket name with S3Bucket
+	// +kubebuilder:validation=Optional
+	Reference *string `json:"reference"`
+
+	// +kubebuilder:validation=Optional
+	Inline *S3BucketInlineSpec `json:"inline,omitempty"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=20
+	MaxConnect int `json:"maxConnect"`
 
 	// +kubebuilder:validation=Optional
 	PathStyleAccess bool `json:"pathStyle_access"`
 }
 
-type S3BucketSpec struct {
-	Reference string `json:"reference"`
+type S3BucketInlineSpec struct {
+
+	// +kubeBuilder:validation=Required
+	Bucket string `json:"bucket"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default="us-east-1"
+	Region string `json:"region,omitempty"`
+
+	// +kubebuilder:validation=Required
+	Endpoints string `json:"endpoints"`
+
+	// +kubebuilder:validation=Optional
+	// +kubebuilder:default=false
+	SSL bool `json:"ssl,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	PathStyle bool `json:"pathStyle,omitempty"`
+
+	// +kubebuilder:validation=Optional
+	AccessKey string `json:"accessKey,omitempty"`
+
+	// +kubebuilder:validation=Optional
+	SecretKey string `json:"secretKey,omitempty"`
 }
 
 type HistorySpec struct {
