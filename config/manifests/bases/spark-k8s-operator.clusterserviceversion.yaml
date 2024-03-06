@@ -18,8 +18,29 @@ spec:
       kind: SparkHistoryServer
       name: sparkhistoryservers.spark.zncdata.dev
       resources:
+      - kind: ConfigMap
+        name: ""
+        version: v1
       - kind: Deployment
-        name: memcached-deployment
+        name: ""
+        version: app/v1
+      - kind: Ingress
+        name: ""
+        version: v1
+      - kind: PersistentVolume
+        name: ""
+        version: v1
+      - kind: PersistentVolumeClaim
+        name: ""
+        version: v1
+      - kind: Pod
+        name: ""
+        version: v1
+      - kind: PodDisruptionBudget
+        name: ""
+        version: v1
+      - kind: Service
+        name: ""
         version: v1
       specDescriptors:
       - description: spark history server cluster config

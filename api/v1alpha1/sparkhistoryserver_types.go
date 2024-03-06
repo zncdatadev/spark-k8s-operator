@@ -23,12 +23,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+operator-sdk:csv:customresourcedefinitions:displayName="Spark History Server",resources={{Deployment,v1,memcached-deployment}}
+// https://book.kubebuilder.io/reference/generating-crd
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +operator-sdk:csv:customresourcedefinitions:displayName="Spark History Server"
+// This annotation provides a hint for OLM which resources are managed by OpenTelemetryCollector kind.
+// It's not mandatory to list all resources.
+// https://sdk.operatorframework.io/docs/olm-integration/generation/#csv-fields
+// https://sdk.operatorframework.io/docs/building-operators/golang/references/markers/
+// +operator-sdk:csv:customresourcedefinitions:resources={{Deployment,app/v1},{Service,v1},{Pod,v1},{ConfigMap,v1},{PersistentVolumeClaim,v1},{PersistentVolume,v1},{PodDisruptionBudget,v1},{Ingress,v1}}
 
 // SparkHistoryServer is the Schema for the sparkhistoryservers API
 type SparkHistoryServer struct {
