@@ -36,6 +36,7 @@ spec:
             description: SparkHistoryServerSpec defines the desired state of SparkHistoryServer
             properties:
               clusterConfig:
+                description: spark history server cluster config
                 properties:
                   ingress:
                     properties:
@@ -150,6 +151,7 @@ spec:
                     type: string
                 type: object
               sparkHistory:
+                description: spark history server role spec
                 properties:
                   commandArgsOverrides:
                     items:

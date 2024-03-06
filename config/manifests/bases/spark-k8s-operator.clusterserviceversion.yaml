@@ -17,6 +17,19 @@ spec:
       displayName: Spark History Server
       kind: SparkHistoryServer
       name: sparkhistoryservers.spark.zncdata.dev
+      resources:
+      - kind: Deployment
+        name: memcached-deployment
+        version: v1
+      specDescriptors:
+      - description: spark history server cluster config
+        displayName: Cluster Config
+        path: clusterConfig
+      - displayName: Image
+        path: image
+      - description: spark history server role spec
+        displayName: Spark History
+        path: sparkHistory
       version: v1alpha1
   description: spark for k8s operator
   displayName: spark-k8s-operator

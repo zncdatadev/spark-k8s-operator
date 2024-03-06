@@ -28,6 +28,7 @@ import (
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+operator-sdk:csv:customresourcedefinitions:displayName="Spark History Server",resources={{Deployment,v1,memcached-deployment}}
 
 // SparkHistoryServer is the Schema for the sparkhistoryservers API
 type SparkHistoryServer struct {
@@ -49,13 +50,18 @@ type SparkHistoryServerList struct {
 
 // SparkHistoryServerSpec defines the desired state of SparkHistoryServer
 type SparkHistoryServerSpec struct {
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	//+kubebuilder:validation:Optional
 	Image *ImageSpec `json:"image,omitempty"`
 
+	// spark history server cluster config
 	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	ClusterConfig *ClusterConfigSpec `json:"clusterConfig,omitempty"`
 
+	// spark history server role spec
 	// +kubebuilder:validation:Required
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	SparkHistory *RoleSpec `json:"sparkHistory"`
 }
 
