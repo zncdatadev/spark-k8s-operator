@@ -1273,7 +1273,7 @@ spec:
                         type: object
                       logging:
                         properties:
-                          metastore:
+                          sparkHistory:
                             properties:
                               console:
                                 description: LogLevelSpec level mapping example |---------------------|-----------------|
@@ -1623,6 +1623,7 @@ spec:
                       spark-defaults.conf:
                         additionalProperties:
                           type: string
+                        description: // +kubebuilder:validation:Optional
                         type: object
                     type: object
                   envOverrides:
@@ -2871,7 +2872,7 @@ spec:
                               type: object
                             logging:
                               properties:
-                                metastore:
+                                sparkHistory:
                                   properties:
                                     console:
                                       description: LogLevelSpec level mapping example
@@ -3250,6 +3251,7 @@ spec:
                             spark-defaults.conf:
                               additionalProperties:
                                 type: string
+                              description: // +kubebuilder:validation:Optional
                               type: object
                           type: object
                         envOverrides:

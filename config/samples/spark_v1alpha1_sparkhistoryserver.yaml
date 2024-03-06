@@ -15,7 +15,7 @@ spec:
     pullPolicy: IfNotPresent
   clusterConfig:
     listener:
-      port: 7077
+      port: 18080
     ingress:
       enabled: true
       annotations:
@@ -33,7 +33,7 @@ spec:
       eventLog:
         enabled: true
         mountMode: pvc
-        dir: /tmp/spark-events
+        dir: /tmp
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
@@ -41,6 +41,10 @@ spec:
       default:
         replicas: 1
         config:
+          logging:
+            sparkHistory:
+              console:
+                level: "INFO"
           resources:
             cpu:
               min: 300m

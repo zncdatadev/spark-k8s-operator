@@ -7,7 +7,7 @@ package v1alpha1
 
 type ContainerLoggingSpec struct {
 	// +kubebuilder:validation:Optional
-	Metastore *LoggingConfigSpec `json:"metastore,omitempty"`
+	SparkHistory *LoggingConfigSpec `json:"sparkHistory,omitempty"`
 }
 
 type LoggingConfigSpec struct {

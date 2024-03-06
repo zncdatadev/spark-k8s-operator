@@ -55,7 +55,7 @@ func (r *SparkHistoryServer) ReconcileRole(ctx context.Context) (ctrl.Result, er
 			r.Labels,
 			string(r.RoleName()),
 			r.Role.Config.PodDisruptionBudget)
-		res, err := pdb.ReconcileResource(ctx, "", pdb)
+		res, err := pdb.ReconcileResource(ctx, pdb)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -123,7 +123,7 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 			mergedLabels,
 			r.GroupName,
 			nil)
-		if resource, err := pdb.ReconcileResource(ctx, r.GroupName, pdb); err != nil {
+		if resource, err := pdb.ReconcileResource(ctx, pdb); err != nil {
 			r.Log.Error(err, "Reconcile pdb  failed", "groupName", r.GroupName)
 			return ctrl.Result{}, err
 		} else if resource.RequeueAfter > 0 {
@@ -133,8 +133,17 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 	// configmap
 	configmap := NewConfigMap(
 		r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg)
-	if res, err := configmap.ReconcileResource(ctx, r.GroupName, configmap); err != nil {
+	if res, err := configmap.ReconcileResource(ctx, configmap); err != nil {
 		r.Log.Error(err, "Reconcile configmap failed", "groupName", r.GroupName)
+		return ctrl.Result{}, err
+	} else if res.RequeueAfter > 0 {
+		return res, nil
+	}
+	//logging
+	loggingData := &SparkHistoryServerLoggingDataBuilder{cfg: mergedGroupCfg}
+	logging := NewLogging(r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg, loggingData)
+	if res, err := logging.ReconcileResource(ctx, logging); err != nil {
+		r.Log.Error(err, "Reconcile logging failed", "groupName", r.GroupName)
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
 		return res, nil
@@ -142,7 +151,7 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 	// secret
 	secret := NewSecret(
 		r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg)
-	if res, err := secret.ReconcileResource(ctx, r.GroupName, secret); err != nil {
+	if res, err := secret.ReconcileResource(ctx, secret); err != nil {
 		r.Log.Error(err, "Reconcile secret failed", "groupName", r.GroupName)
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
@@ -151,7 +160,7 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 	//pvc
 	pvc := NewPvc(
 		r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg)
-	if res, err := pvc.ReconcileResource(ctx, r.GroupName, pvc); err != nil {
+	if res, err := pvc.ReconcileResource(ctx, pvc); err != nil {
 		r.Log.Error(err, "Reconcile pvc failed", "groupName", r.GroupName)
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
@@ -160,7 +169,7 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 	//deployment
 	deployment := NewDeployment(
 		r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg, mergedGroupCfg.Replicas)
-	if res, err := deployment.ReconcileResource(ctx, r.GroupName, deployment); err != nil {
+	if res, err := deployment.ReconcileResource(ctx, deployment); err != nil {
 		r.Log.Error(err, "Reconcile deployment failed", "groupName", r.GroupName)
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
@@ -169,7 +178,7 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 	// service
 	svc := NewService(
 		r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg)
-	if res, err := svc.ReconcileResource(ctx, r.GroupName, svc); err != nil {
+	if res, err := svc.ReconcileResource(ctx, svc); err != nil {
 		r.Log.Error(err, "Reconcile service failed", "groupName", r.GroupName)
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
@@ -178,7 +187,7 @@ func (r *RoleMasterGroup) ReconcileGroup(ctx context.Context) (ctrl.Result, erro
 	//ingress
 	ingress := NewIngress(
 		r.Scheme, r.Instance, r.Client, r.GroupName, mergedLabels, mergedGroupCfg)
-	if res, err := ingress.ReconcileResource(ctx, r.GroupName, ingress); err != nil {
+	if res, err := ingress.ReconcileResource(ctx, ingress); err != nil {
 		r.Log.Error(err, "Reconcile ingress failed", "groupName", r.GroupName)
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
@@ -226,3 +235,19 @@ func mergeConfig(
 //type LogDataBuilder struct {
 //	cfg *sparkv1alpha1.RoleGroupSpec
 //}
+
+type SparkHistoryServerLoggingDataBuilder struct {
+	cfg *sparkv1alpha1.RoleGroupSpec
+}
+
+// MakeContainerLog4jData implement RoleLoggingDataBuilder interface
+func (s *SparkHistoryServerLoggingDataBuilder) MakeContainerLog4jData() map[string]string {
+	cfg := s.cfg
+	data := make(map[string]string)
+	//worker logger data
+	if cfg.Config.Logging != nil {
+		workerLogger := PropertiesValue(sparkConfigName, cfg.Config.Logging.SparkHistory)
+		data[Log4jCfgName] = workerLogger
+	}
+	return data
+}

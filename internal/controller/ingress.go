@@ -37,7 +37,7 @@ func NewIngress(
 // Build implements the ResourceBuilder interface
 func (i *IngressReconciler) Build(_ context.Context) (client.Object, error) {
 	ingressSpec := i.getIngressSpec()
-	pt := v1.PathTypeImplementationSpecific
+	pt := v1.PathTypePrefix
 	ing := &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      createIngName(i.Instance.Name, i.GroupName),

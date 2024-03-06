@@ -94,15 +94,19 @@ type RoleSpec struct {
 
 	// +kubebuilder:validation:Optional
 	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
+
 	//// +kubebuilder:validation:Optional
 	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
 }
 
 type ConfigOverridesSpec struct {
+	//// +kubebuilder:validation:Optional
 	SparkConfig map[string]string `json:"spark-defaults.conf,omitempty"`
 }
 
@@ -127,8 +131,10 @@ type ConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	StorageClass string `json:"storageClass,omitempty"`
+
 	// +kubebuilder:default="10Gi"
 	StorageSize string `json:"size,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	History *HistorySpec `json:"history"`
 
@@ -156,10 +162,13 @@ type RoleGroupSpec struct {
 
 	// +kubebuilder:validation:Optional
 	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
+
 	//// +kubebuilder:validation:Optional
 	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
 }
@@ -182,10 +191,13 @@ type IngressSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=true
 	Enabled bool `json:"enabled,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	TLS *networkingv1.IngressTLS `json:"tls,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:="spark-history-server.example.com"
 	Host string `json:"host,omitempty"`

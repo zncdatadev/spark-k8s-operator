@@ -68,7 +68,6 @@ func NewBaseResourceReconciler[T client.Object, G any](
 
 func (b *BaseResourceReconciler[T, G]) ReconcileResource(
 	ctx context.Context,
-	groupName string,
 	resInstance ResourceBuilder) (ctrl.Result, error) {
 	// 1. mergelables
 	// 2. build resource
@@ -86,7 +85,10 @@ func (b *BaseResourceReconciler[T, G]) ReconcileResource(
 	}
 }
 
-func (b *BaseResourceReconciler[T, G]) Apply(ctx context.Context, dep client.Object) (ctrl.Result, error) {
+func (b *BaseResourceReconciler[T, G]) Apply(
+	ctx context.Context,
+	dep client.Object,
+	timeAfter time.Duration) (ctrl.Result, error) {
 	if dep == nil {
 		return ctrl.Result{}, nil
 	}
@@ -99,7 +101,7 @@ func (b *BaseResourceReconciler[T, G]) Apply(ctx context.Context, dep client.Obj
 	}
 
 	if mutant {
-		return ctrl.Result{RequeueAfter: time.Minute}, nil
+		return ctrl.Result{RequeueAfter: timeAfter}, nil
 	}
 	return ctrl.Result{}, nil
 }
@@ -135,7 +137,7 @@ func (s *GeneralResourceStyleReconciler[T, G]) DoReconcile(
 	resource client.Object,
 	_ ResourceHandler,
 ) (ctrl.Result, error) {
-	return s.Apply(ctx, resource)
+	return s.Apply(ctx, resource, time.Millisecond*500)
 }
 
 // ConfigurationStyleReconciler configuration style reconciler
@@ -181,7 +183,7 @@ func (s *ConfigurationStyleReconciler[T, G]) DoReconcile(
 	} else {
 		panic("resource is not ConfigurationOverride")
 	}
-	return s.Apply(ctx, resource)
+	return s.Apply(ctx, resource, time.Millisecond*500)
 }
 
 // DeploymentStyleReconciler deployment style reconciler
@@ -238,7 +240,7 @@ func (s *DeploymentStyleReconciler[T, G]) DoReconcile(
 		panic("resource is not WorkloadOverride")
 	}
 
-	if res, err := s.Apply(ctx, resource); err != nil {
+	if res, err := s.Apply(ctx, resource, time.Minute); err != nil {
 		return ctrl.Result{}, err
 	} else if res.RequeueAfter > 0 {
 		return res, nil
