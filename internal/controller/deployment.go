@@ -24,7 +24,6 @@ func NewDeployment(
 	mergedLabels map[string]string,
 	mergedCfg *sparkv1alpha1.RoleGroupSpec,
 	replicates int32,
-
 ) *DeploymentReconciler {
 	return &DeploymentReconciler{
 		DeploymentStyleReconciler: *common.NewDeploymentStyleReconciler[*sparkv1alpha1.SparkHistoryServer,
