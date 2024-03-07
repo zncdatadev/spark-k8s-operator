@@ -17,6 +17,40 @@ spec:
       displayName: Spark History Server
       kind: SparkHistoryServer
       name: sparkhistoryservers.spark.zncdata.dev
+      resources:
+      - kind: ConfigMap
+        name: ""
+        version: v1
+      - kind: Deployment
+        name: ""
+        version: app/v1
+      - kind: Ingress
+        name: ""
+        version: v1
+      - kind: PersistentVolume
+        name: ""
+        version: v1
+      - kind: PersistentVolumeClaim
+        name: ""
+        version: v1
+      - kind: Pod
+        name: ""
+        version: v1
+      - kind: PodDisruptionBudget
+        name: ""
+        version: v1
+      - kind: Service
+        name: ""
+        version: v1
+      specDescriptors:
+      - description: spark history server cluster config
+        displayName: Cluster Config
+        path: clusterConfig
+      - displayName: Image
+        path: image
+      - description: spark history server role spec
+        displayName: Spark History
+        path: sparkHistory
       version: v1alpha1
   description: spark for k8s operator
   displayName: spark-k8s-operator
