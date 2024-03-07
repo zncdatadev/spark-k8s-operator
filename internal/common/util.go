@@ -41,16 +41,6 @@ func (r *ResourceNameGenerator) GenerateResourceName(extraSuffix string) string 
 	return res
 }
 
-// CreateMasterConfigMapName create configMap Name
-func CreateMasterConfigMapName(instanceName string, groupName string) string {
-	return NewResourceNameGenerator(instanceName, "", groupName).GenerateResourceName("config")
-}
-
-// CreateRoleGroupLoggingConfigMapName create role group logging config-map name
-func CreateRoleGroupLoggingConfigMapName(instanceName string, role string, groupName string) string {
-	return NewResourceNameGenerator(instanceName, role, groupName).GenerateResourceName("log4j")
-}
-
 func OverrideEnvVars(origin *[]corev1.EnvVar, override map[string]string) {
 	for _, env := range *origin {
 		// if env Name is in override, then override it
@@ -59,12 +49,7 @@ func OverrideEnvVars(origin *[]corev1.EnvVar, override map[string]string) {
 		}
 	}
 }
-func GetStorageClass(origin string) *string {
-	if origin == "" {
-		return nil
-	}
-	return &origin
-}
+
 func ConvertToResourceRequirements(resources *sparkv1alpha1.ResourcesSpec) *corev1.ResourceRequirements {
 	var (
 		cpuMin      = resource.MustParse("100m")

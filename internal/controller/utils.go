@@ -29,6 +29,11 @@ func createIngName(instanceName string, groupName string) string {
 	return common.NewResourceNameGenerator(instanceName, "", groupName).GenerateResourceName("")
 }
 
+// CreateRoleGroupLoggingConfigMapName create role group logging config-map name
+func CreateRoleGroupLoggingConfigMapName(instanceName string, groupName string) string {
+	return common.NewResourceNameGenerator(instanceName, "", groupName).GenerateResourceName("log4j")
+}
+
 func getServiceSpec(instance *sparkv1alpha1.SparkHistoryServer) *sparkv1alpha1.ListenerSpec {
 	spec := instance.Spec.ClusterConfig.Listener
 	if spec == nil {

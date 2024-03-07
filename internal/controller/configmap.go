@@ -38,6 +38,8 @@ func NewConfigMap(
 	}
 }
 
+const sparkConfigName = "spark-defaults.conf"
+
 // Build implements the ResourceBuilder interface
 func (c *ConfigMapReconciler) Build(ctx context.Context) (client.Object, error) {
 	if configContent, err := c.makeSparkConfigData(ctx); err != nil {
@@ -50,7 +52,7 @@ func (c *ConfigMapReconciler) Build(ctx context.Context) (client.Object, error) 
 				Labels:    c.MergedLabels,
 			},
 			Data: map[string]string{
-				"spark-defaults.conf": *configContent,
+				sparkConfigName: *configContent,
 			},
 		}
 		return cm, nil
@@ -63,11 +65,22 @@ func (c *ConfigMapReconciler) ConfigurationOverride(resource client.Object) {
 	overrides := cfg.ConfigOverrides
 	if overrides != nil {
 		configMap := resource.(*corev1.ConfigMap)
-		data := &configMap.Data
-		for k, v := range overrides.SparkConfig {
-			(*data)[k] = v
+		if overrideConfigContent := c.makeSparkConfigContent(overrides.SparkConfig); overrideConfigContent != nil {
+			configMap.Data[sparkConfigName] = *overrideConfigContent
 		}
 	}
+}
+
+// make spark-defaults.conf file content
+func (c *ConfigMapReconciler) makeSparkConfigContent(override map[string]string) *string {
+	if override != nil {
+		var content string
+		for k, v := range override {
+			content += fmt.Sprintf("%s %s\n", k, v)
+		}
+		return &content
+	}
+	return nil
 }
 
 func (c *ConfigMapReconciler) makeSparkConfigData(ctx context.Context) (*string, error) {

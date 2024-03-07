@@ -46,7 +46,7 @@ func (d *DeploymentReconciler) GetConditions() *[]metav1.Condition {
 }
 
 // Build implements the ResourceBuilder interface
-func (d *DeploymentReconciler) Build(ctx context.Context) (client.Object, error) {
+func (d *DeploymentReconciler) Build(_ context.Context) (client.Object, error) {
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      createDeploymentName(d.Instance.Name, d.GroupName),
@@ -77,17 +77,75 @@ func (d *DeploymentReconciler) Build(ctx context.Context) (client.Object, error)
 
 // CommandOverride implement the WorkloadOverride interface
 func (d *DeploymentReconciler) CommandOverride(resource client.Object) {
-
+	dep := resource.(*appsv1.Deployment)
+	containers := dep.Spec.Template.Spec.Containers
+	if cmdOverride := d.MergedCfg.CommandArgsOverrides; cmdOverride != nil {
+		for i := range containers {
+			containers[i].Command = cmdOverride
+		}
+	}
 }
 
 // EnvOverride implement the WorkloadOverride interface
 func (d *DeploymentReconciler) EnvOverride(resource client.Object) {
-
+	dep := resource.(*appsv1.Deployment)
+	containers := dep.Spec.Template.Spec.Containers
+	if envOverride := d.MergedCfg.EnvOverrides; envOverride != nil {
+		for i := range containers {
+			envVars := containers[i].Env
+			common.OverrideEnvVars(&envVars, d.MergedCfg.EnvOverrides)
+		}
+	}
 }
 
 // LogOverride implement the WorkloadOverride interface
 func (d *DeploymentReconciler) LogOverride(resource client.Object) {
+	if d.isLoggersOverrideEnabled() {
+		d.logVolumesOverride(resource)
+		d.logVolumeMountsOverride(resource)
+	}
+}
 
+// is loggers override enabled
+func (d *DeploymentReconciler) isLoggersOverrideEnabled() bool {
+	return d.MergedCfg.Config.Logging != nil
+}
+
+func (d *DeploymentReconciler) logVolumesOverride(resource client.Object) {
+	dep := resource.(*appsv1.Deployment)
+	volumes := dep.Spec.Template.Spec.Volumes
+	if len(volumes) == 0 {
+		volumes = make([]corev1.Volume, 1)
+	}
+	volumes = append(volumes, corev1.Volume{
+		Name: d.log4jVolumeName(),
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: CreateRoleGroupLoggingConfigMapName(d.Instance.Name, d.GroupName),
+				},
+				Items: []corev1.KeyToPath{
+					{
+						Key:  Log4jCfgName,
+						Path: Log4jCfgName,
+					},
+				},
+			},
+		},
+	})
+	dep.Spec.Template.Spec.Volumes = volumes
+}
+
+func (d *DeploymentReconciler) logVolumeMountsOverride(resource client.Object) {
+	dep := resource.(*appsv1.Deployment)
+	containers := dep.Spec.Template.Spec.Containers
+	for i := range containers {
+		containers[i].VolumeMounts = append(containers[i].VolumeMounts, corev1.VolumeMount{
+			Name:      d.log4jVolumeName(),
+			MountPath: "/opt/bitnami/spark/conf/log4j2.properties",
+			SubPath:   Log4jCfgName,
+		})
+	}
 }
 
 // create container
@@ -119,12 +177,12 @@ func (d *DeploymentReconciler) createContainer() corev1.Container {
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      d.createConfigVolumeName(),
+				Name:      d.configVolumeName(),
 				MountPath: "/opt/bitnami/spark/conf/spark-defaults.conf",
 				SubPath:   "spark-defaults.conf",
 			},
 			{
-				Name:      d.createDataVolumeName(),
+				Name:      d.dataVolumeName(),
 				MountPath: d.getMountPath(),
 			},
 		},
@@ -135,7 +193,7 @@ func (d *DeploymentReconciler) createContainer() corev1.Container {
 func (d *DeploymentReconciler) createVolumes() []corev1.Volume {
 	return []corev1.Volume{
 		{
-			Name: d.createConfigVolumeName(),
+			Name: d.configVolumeName(),
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -145,7 +203,7 @@ func (d *DeploymentReconciler) createVolumes() []corev1.Volume {
 			},
 		},
 		{
-			Name: d.createDataVolumeName(),
+			Name: d.dataVolumeName(),
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: createPvcName(d.Instance.Name, d.GroupName),
@@ -184,10 +242,15 @@ func (d *DeploymentReconciler) getMountPath() string {
 	return mountPath
 }
 
-func (d *DeploymentReconciler) createConfigVolumeName() string {
+func (d *DeploymentReconciler) configVolumeName() string {
 	return "config-volume"
 }
 
-func (d *DeploymentReconciler) createDataVolumeName() string {
+func (d *DeploymentReconciler) dataVolumeName() string {
 	return "data-volume"
+}
+
+// create log4j2 volume name
+func (d *DeploymentReconciler) log4jVolumeName() string {
+	return "log4j2-volume"
 }

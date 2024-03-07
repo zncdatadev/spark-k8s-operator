@@ -56,16 +56,9 @@ func (s *SecretReconciler) Build(ctx context.Context) (client.Object, error) {
 }
 
 // ConfigurationOverride implement the ConfigurationOverride interface
-func (s *SecretReconciler) ConfigurationOverride(resource client.Object) {
-	cfg := s.MergedCfg
-	overrides := cfg.ConfigOverrides
-	if overrides != nil {
-		configMap := resource.(*corev1.Secret)
-		data := &configMap.Data
-		for k, v := range overrides.SparkConfig {
-			(*data)[k] = []byte(v)
-		}
-	}
+func (s *SecretReconciler) ConfigurationOverride(_ client.Object) {
+	// no override for secret
+	// secret is unnecessary to be overridden
 }
 
 // makeSparkSecretData creates the secret data

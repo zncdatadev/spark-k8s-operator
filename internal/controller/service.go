@@ -8,6 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -53,9 +54,10 @@ func (s *ServiceReconciler) Build(_ context.Context) (client.Object, error) {
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Port:     svcSpec.Port,
-					Name:     "http",
-					Protocol: "TCP",
+					Port:       svcSpec.Port,
+					Name:       "http",
+					Protocol:   "TCP",
+					TargetPort: intstr.FromString("http"),
 				},
 			},
 			Selector: s.MergedLabels,
