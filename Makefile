@@ -320,8 +320,6 @@ else
 KIND=$(shell which kind)
 endif
 
-KIND_KUBECONFIG = ./kubeconfig.yaml
-KIND_CLUSTER_NAME = spark-operator
 OLM_VERSION ?= v0.27.0
 
 # Create a kind cluster, install ingress-nginx, and wait for it to be available.
@@ -361,20 +359,17 @@ endif
 .PHONY: chainsaw-setup
 chainsaw-setup: ## Run the chainsaw setup
 	@echo "\nSetup chainsaw test environment"
+	make install
 	make docker-build
-	make bundle
-	make bundle-build
-	$(KIND) load docker-image $(IMG) $(BUNDLE_IMG)
-	@echo -e "\nRunning chainsaw tests"
-	$(OPERATOR_SDK) run bundle $(BUNDLE_IMG) --namespace default --install-mode OwnNamespace --timeout 5m
-	kubectl wait deployment spark-k8s-operator-controller-manager --for=condition=available --timeout=300s
-
+	$(KIND) load docker-image $(IMG)
+	make deploy
 
 .PHONY: chainsaw-test
 chainsaw-test: chainsaw ## Run the chainsaw test
-	$(CHAINSAW) test --test-dir ./test/e2e --cluster $(KIND_CLUSTER_NAME)=$(KIND_KUBECONFIG)
+	$(CHAINSAW) test --test-dir ./test/e2e --assert-timeout 120s --cleanup-timeout 120s --delete-timeout 120s
 
 
 .PHONY: chainsaw-cleanup
 chainsaw-cleanup: chainsaw ## Run the chainsaw cleanup
-	$(OPERATOR_SDK) cleanup $(PROJECT_NAME)
+	make uninstall
+	make undeploy
