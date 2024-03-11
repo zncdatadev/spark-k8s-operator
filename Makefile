@@ -304,3 +304,77 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+# kind
+KIND_VERSION ?= v0.22.0
+
+.PHONY: kind
+kind: ## Download kind locally if necessary.
+ifeq (,$(shell which kind))
+	@{ \
+	set -e ;\
+	go install sigs.k8s.io/kind@$(KIND_VERSION) ;\
+	}
+KIND=$(GOBIN)/bin/kind
+else
+KIND=$(shell which kind)
+endif
+
+KIND_KUBECONFIG = ./kubeconfig.yaml
+KIND_CLUSTER_NAME = spark-operator
+OLM_VERSION ?= v0.27.0
+
+# Create a kind cluster, install ingress-nginx, and wait for it to be available.
+.PHONY: kind-create
+kind-create: kind ## Create a kind cluster.
+	$(KIND) create cluster --config test/e2e/kind.yaml
+	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+	kubectl -n ingress-nginx wait deployment ingress-nginx-controller --for=condition=available --timeout=300s
+	curl -sSL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/install.sh | bash -s $(OLM_VERSION)
+
+.PHONY: kind-delete
+kind-delete: kind ## Delete a kind cluster.
+	$(KIND) delete cluster
+
+##@ e2e
+
+CHAINSAW_VERSION ?= v0.1.8
+
+.PHONY: chainsaw
+chainsaw: ## Download chainsaw locally if necessary.
+ifeq (,$(shell which chainsaw))
+	@{ \
+	set -e ;\
+	go install github.com/kyverno/chainsaw@$(CHAINSAW_VERSION) ;\
+	}
+CHAINSAW=$(GOBIN)/bin/chainsaw
+else
+CHAINSAW=$(shell which chainsaw)
+endif
+
+# chainsaw setup logical
+# - Build the operator docker image
+# - Load the operator docker image into the kind cluster. When create
+#   operator deployment, it will use the image in the kind cluster.
+# - Rebuild the bundle. If override VERSION / REGISTRY or other variables,
+#   we need to rebuild the bundle to use the new image, or other changes.
+.PHONY: chainsaw-setup
+chainsaw-setup: ## Run the chainsaw setup
+	@echo "\nSetup chainsaw test environment"
+	make docker-build
+	make bundle
+	make bundle-build
+	$(KIND) load docker-image $(IMG) $(BUNDLE_IMG)
+	@echo -e "\nRunning chainsaw tests"
+	$(OPERATOR_SDK) run bundle $(BUNDLE_IMG) --namespace default --install-mode OwnNamespace --timeout 5m
+	kubectl wait deployment spark-k8s-operator-controller-manager --for=condition=available --timeout=300s
+
+
+.PHONY: chainsaw-test
+chainsaw-test: chainsaw ## Run the chainsaw test
+	$(CHAINSAW) test --test-dir ./test/e2e --cluster $(KIND_CLUSTER_NAME)=$(KIND_KUBECONFIG)
+
+
+.PHONY: chainsaw-cleanup
+chainsaw-cleanup: chainsaw ## Run the chainsaw cleanup
+	$(OPERATOR_SDK) cleanup $(PROJECT_NAME)
