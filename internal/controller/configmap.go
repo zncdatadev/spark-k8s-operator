@@ -102,8 +102,7 @@ func (c *ConfigMapReconciler) makeSparkConfigData(ctx context.Context) (*string,
 	return &cfgContent, nil
 }
 
-const s3CfgTemp = `
-spark.hadoop.fs.s3a.endpoint %s
+const s3CfgTemp = `spark.hadoop.fs.s3a.endpoint %s
 spark.hadoop.fs.s3a.ssl.enabled %t
 spark.hadoop.fs.s3a.impl org.apache.hadoop.fs.s3a.S3AFileSystem
 spark.hadoop.fs.s3a.fast.upload true
@@ -143,8 +142,7 @@ func (c *ConfigMapReconciler) createS3Configuration(
 	)
 }
 
-const eventLogCfgTemp = `
-spark.eventLog.enabled %t
+const eventLogCfgTemp = `spark.eventLog.enabled %t
 spark.eventLog.dir %s
 spark.history.fs.logDirectory %s
 `
@@ -167,8 +165,7 @@ func (c *ConfigMapReconciler) makeEventLogConfig() *string {
 	return &cfg
 }
 
-const historyCfgTemp = `
-spark.history.fs.cleaner.enabled %t
+const historyCfgTemp = `spark.history.fs.cleaner.enabled %t
 spark.history.fs.cleaner.maxNum %d
 spark.history.fs.cleaner.maxAge %s
 spark.history.fs.eventLog.rolling.maxFilesToRetain %d
