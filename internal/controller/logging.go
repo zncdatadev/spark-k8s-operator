@@ -10,8 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const DefaultLog4jProperties = `
-# Set everything to be logged to the console
+const DefaultLog4jProperties = `# Set everything to be logged to the console
 rootLogger.level = info
 rootLogger.appenderRef.stdout.ref = console
 
