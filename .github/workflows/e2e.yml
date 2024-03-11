@@ -1,0 +1,23 @@
+# e2e test
+
+name: e2e-test
+
+on: ['push', 'pull_request']
+
+jobs:
+  chainsaw-test:
+    name: Chainsaw Test
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: false
+
+    - name: Create KinD cluster
+      run: make kind-create
+    - name: Chainsaw test setup
+      run: make chainsaw-setup
+    - name: Test with Chainsaw
+      run: make chainsaw-test
