@@ -309,15 +309,18 @@ catalog-push: ## Push a catalog image.
 KIND_VERSION ?= v0.22.0
 
 .PHONY: kind
+KIND = $(LOCALBIN)/kind
 kind: ## Download kind locally if necessary.
-ifeq (,$(shell which kind))
+ifeq (,$(shell which $(KIND)))
+ifeq (,$(shell which kind 2>/dev/null))
 	@{ \
 	set -e ;\
 	go install sigs.k8s.io/kind@$(KIND_VERSION) ;\
 	}
-KIND=$(GOBIN)/bin/kind
+KIND = $(GOBIN)/bin/kind
 else
-KIND=$(shell which kind)
+KIND = $(shell which kind)
+endif
 endif
 
 OLM_VERSION ?= v0.27.0
@@ -339,15 +342,18 @@ kind-delete: kind ## Delete a kind cluster.
 CHAINSAW_VERSION ?= v0.1.8
 
 .PHONY: chainsaw
+CHAINSAW = $(LOCALBIN)/chainsaw
 chainsaw: ## Download chainsaw locally if necessary.
-ifeq (,$(shell which chainsaw))
+ifeq (,$(shell which $(CHAINSAW)))
+ifeq (,$(shell which chainsaw 2>/dev/null))
 	@{ \
 	set -e ;\
 	go install github.com/kyverno/chainsaw@$(CHAINSAW_VERSION) ;\
 	}
-CHAINSAW=$(GOBIN)/bin/chainsaw
+CHAINSAW = $(GOBIN)/chainsaw
 else
-CHAINSAW=$(shell which chainsaw)
+CHAINSAW = $(shell which chainsaw)
+endif
 endif
 
 # chainsaw setup logical
