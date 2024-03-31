@@ -14,8 +14,7 @@ spec:
     tag: 3.1.1
     pullPolicy: IfNotPresent
   clusterConfig:
-    listener:
-      port: 18080
+    listenerClass: external-unstable
     ingress:
       enabled: true
       annotations:

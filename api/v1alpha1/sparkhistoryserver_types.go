@@ -23,6 +23,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TODO: move ListenerClass and impl logic to listener project
+// Finnaly, we should use it from operator-go project
+type ListenerClass string
+
+const (
+	ClusterInternal  ListenerClass = "cluster-internal"
+	ExternalUnstable ListenerClass = "external-unstable"
+	ExternalStable   ListenerClass = "external-stable"
+)
+
 // https://book.kubebuilder.io/reference/generating-crd
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
@@ -74,7 +84,9 @@ type ClusterConfigSpec struct {
 	S3Bucket *S3BucketSpec `json:"s3Bucket,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Listener *ListenerSpec `json:"listener,omitempty"`
+	// +kubebuilder:default:=cluster-internal
+	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
+	ListenerClass ListenerClass `json:"listenerClass,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	Ingress *IngressSpec `json:"ingress,omitempty"`
@@ -179,20 +191,6 @@ type RoleGroupSpec struct {
 
 	// +kubebuilder:validation:Optional
 	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
-}
-
-type ListenerSpec struct {
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// +kubebuilder:validation:enum=ClusterIP;NodePort;LoadBalancer;ExternalName
-	// +kubebuilder:default=ClusterIP
-	Type corev1.ServiceType `json:"type,omitempty"`
-
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:default=9083
-	Port int32 `json:"port,omitempty"`
 }
 
 type IngressSpec struct {

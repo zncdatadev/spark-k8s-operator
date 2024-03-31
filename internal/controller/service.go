@@ -39,35 +39,42 @@ func NewService(
 	}
 }
 
+func (s *ServiceReconciler) GetServiceType(ctx context.Context) corev1.ServiceType {
+
+	listenerInfo := common.NewListenerInfo(
+		&SparkHistoryInstance{Instance: s.Instance},
+		common.ResourceClient{
+			Ctx:       ctx,
+			Client:    s.Client,
+			Namespace: s.Instance.Namespace,
+		},
+	)
+
+	return listenerInfo.GetServiceType()
+}
+
 // Build implements the ResourceBuilder interface
-func (s *ServiceReconciler) Build(_ context.Context) (client.Object, error) {
+func (s *ServiceReconciler) Build(ctx context.Context) (client.Object, error) {
 	instance := s.Instance
 	roleGroupName := s.GroupName
-	svcSpec := s.getServiceSpec()
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        createServiceName(instance.Name, roleGroupName),
-			Namespace:   instance.Namespace,
-			Labels:      s.MergedLabels,
-			Annotations: svcSpec.Annotations,
+			Name:      createServiceName(instance.Name, roleGroupName),
+			Namespace: instance.Namespace,
+			Labels:    s.MergedLabels,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Port:       svcSpec.Port,
-					Name:       "http",
-					Protocol:   "TCP",
-					TargetPort: intstr.FromString("http"),
+					Port:       SparkHistoryHTTPPortNumber,
+					Name:       SparkHistoryHTTPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.IntOrString{IntVal: SparkHistoryHTTPPortNumber},
 				},
 			},
 			Selector: s.MergedLabels,
-			Type:     svcSpec.Type,
+			Type:     s.GetServiceType(ctx),
 		},
 	}
 	return svc, nil
-}
-
-// get service spec
-func (s *ServiceReconciler) getServiceSpec() *sparkv1alpha1.ListenerSpec {
-	return getServiceSpec(s.Instance)
 }

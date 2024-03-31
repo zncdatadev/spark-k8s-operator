@@ -191,7 +191,7 @@ func (d *DeploymentReconciler) createContainer() corev1.Container {
 		},
 		Ports: []corev1.ContainerPort{
 			{
-				ContainerPort: 18080,
+				ContainerPort: SparkHistoryHTTPPortNumber,
 				Name:          "http",
 				Protocol:      "TCP",
 			},

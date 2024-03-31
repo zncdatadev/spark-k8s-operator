@@ -1,8 +1,12 @@
 package controller
 
 import (
-	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
+)
+
+const (
+	SparkHistoryHTTPPortName   string = "http"
+	SparkHistoryHTTPPortNumber int32  = 18080
 )
 
 func createConfigName(instanceName string, groupName string) string {
@@ -32,15 +36,4 @@ func createIngName(instanceName string, groupName string) string {
 // CreateRoleGroupLoggingConfigMapName create role group logging config-map name
 func CreateRoleGroupLoggingConfigMapName(instanceName string, groupName string) string {
 	return common.NewResourceNameGenerator(instanceName, "", groupName).GenerateResourceName("log4j")
-}
-
-func getServiceSpec(instance *sparkv1alpha1.SparkHistoryServer) *sparkv1alpha1.ListenerSpec {
-	spec := instance.Spec.ClusterConfig.Listener
-	if spec == nil {
-		spec = &sparkv1alpha1.ListenerSpec{
-			Type: "ClusterIP",
-			Port: 9083,
-		}
-	}
-	return spec
 }
