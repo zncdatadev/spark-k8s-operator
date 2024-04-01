@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+
 	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	v1 "k8s.io/api/networking/v1"
@@ -37,7 +38,7 @@ func NewIngress(
 // Build implements the ResourceBuilder interface
 func (i *IngressReconciler) Build(_ context.Context) (client.Object, error) {
 	ingressSpec := i.getIngressSpec()
-	pt := v1.PathTypePrefix
+	pathTypePrefix := v1.PathTypePrefix
 	ing := &v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      createIngName(i.Instance.Name, i.GroupName),
@@ -53,12 +54,12 @@ func (i *IngressReconciler) Build(_ context.Context) (client.Object, error) {
 							Paths: []v1.HTTPIngressPath{
 								{
 									Path:     "/",
-									PathType: &pt,
+									PathType: &pathTypePrefix,
 									Backend: v1.IngressBackend{
 										Service: &v1.IngressServiceBackend{
 											Name: createServiceName(i.Instance.Name, i.GroupName),
 											Port: v1.ServiceBackendPort{
-												Number: i.getServicePort(),
+												Name: SparkHistoryHTTPPortName,
 											},
 										},
 									},
@@ -83,10 +84,4 @@ func (i *IngressReconciler) getIngressSpec() *sparkv1alpha1.IngressSpec {
 		}
 	}
 	return spec
-}
-
-// get service port
-func (i *IngressReconciler) getServicePort() int32 {
-	svcSpec := getServiceSpec(i.Instance)
-	return svcSpec.Port
 }

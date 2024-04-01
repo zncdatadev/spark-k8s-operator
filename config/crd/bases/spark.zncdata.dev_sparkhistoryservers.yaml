@@ -79,24 +79,15 @@ spec:
                             type: string
                         type: object
                     type: object
-                  listener:
-                    properties:
-                      annotations:
-                        additionalProperties:
-                          type: string
-                        type: object
-                      port:
-                        default: 9083
-                        format: int32
-                        maximum: 65535
-                        minimum: 1
-                        type: integer
-                      type:
-                        default: ClusterIP
-                        description: Service Type string describes ingress methods
-                          for a service
-                        type: string
-                    type: object
+                  listenerClass:
+                    default: cluster-internal
+                    description: 'TODO: move ListenerClass and impl logic to listener
+                      project Finnaly, we should use it from operator-go project'
+                    enum:
+                    - cluster-internal
+                    - external-unstable
+                    - external-stable
+                    type: string
                   s3Bucket:
                     properties:
                       inline:

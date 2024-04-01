@@ -23,7 +23,7 @@ spec:
           service:
             name: sparkhistoryserver-sample-default
             port:
-              number: 18080
+              name: http
 status:
   loadBalancer:
     ingress:
