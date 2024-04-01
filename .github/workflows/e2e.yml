@@ -19,8 +19,15 @@ jobs:
         cache: false
 
     - name: Create KinD cluster
-      run: make kind-create ENVTEST_K8S_VERSION=${{ matrix.k8s-version}}
+      env:
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version}}
+        ENVTEST_K8S_VERSION: ${{ matrix.k8s-version}}
+      run: make kind-create
     - name: Chainsaw test setup
+      env:
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version}}
       run: make chainsaw-setup
     - name: Test with Chainsaw
+      env:
+        KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version}}
       run: make chainsaw-test
