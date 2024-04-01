@@ -56,7 +56,7 @@ OPERATOR_SDK_VERSION ?= v1.33.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY)/spark-k8s-operator:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.26.0
+ENVTEST_K8S_VERSION ?= 1.26.14
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -325,8 +325,13 @@ catalog-docker-buildx: ## Build and push a catalog image for cross-platform supp
 	- $(CONTAINER_TOOL) buildx build -f catalog.Dockerfile --push --tag ${CATALOG_IMG} .
 	- $(CONTAINER_TOOL) buildx rm project-v3-builder
 
+##@ E2E
+
 # kind
 KIND_VERSION ?= v0.22.0
+
+KIND_KUBECONFIG ?= ./kind-kubeconfig
+KIND_CLUSTER_NAME ?= ${PROJECT_NAME}
 
 .PHONY: kind
 KIND = $(LOCALBIN)/kind
@@ -348,16 +353,21 @@ OLM_VERSION ?= v0.27.0
 # Create a kind cluster, install ingress-nginx, and wait for it to be available.
 .PHONY: kind-create
 kind-create: kind ## Create a kind cluster.
-	$(KIND) create cluster --config test/e2e/kind.yaml
+	$(KIND) create cluster --config test/e2e/kind-$(ENVTEST_K8S_VERSION).yaml --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
+	make kind-setup KUBECONFIG=$(KIND_KUBECONFIG)
+
+.PHONY: kind-setup
+kind-setup: kind ## setup kind cluster base environment
+	@echo "\nSetup kind cluster base environment, install ingress-nginx and OLM"
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 	kubectl -n ingress-nginx wait deployment ingress-nginx-controller --for=condition=available --timeout=300s
 	curl -sSL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/$(OLM_VERSION)/install.sh | bash -s $(OLM_VERSION)
 
 .PHONY: kind-delete
 kind-delete: kind ## Delete a kind cluster.
-	$(KIND) delete cluster
+	$(KIND) delete cluster --name $(KIND_CLUSTER_NAME)
 
-##@ e2e
+# chainsaw
 
 CHAINSAW_VERSION ?= v0.1.8
 
@@ -383,19 +393,17 @@ endif
 # - Rebuild the bundle. If override VERSION / REGISTRY or other variables,
 #   we need to rebuild the bundle to use the new image, or other changes.
 .PHONY: chainsaw-setup
-chainsaw-setup: ## Run the chainsaw setup
+chainsaw-setup: manifests kustomize ## Run the chainsaw setup
 	@echo "\nSetup chainsaw test environment"
-	make install
 	make docker-build
-	$(KIND) load docker-image $(IMG)
-	make deploy
+	$(KIND) --name $(KIND_CLUSTER_NAME) load docker-image $(IMG)
+	make deploy KUBECONFIG=$(KIND_KUBECONFIG)
 
 .PHONY: chainsaw-test
 chainsaw-test: chainsaw ## Run the chainsaw test
-	$(CHAINSAW) test --test-dir ./test/e2e --assert-timeout 120s --cleanup-timeout 120s --delete-timeout 120s
+	$(CHAINSAW) test --cluster cluster-1=$(KIND_KUBECONFIG) --test-dir ./test/e2e --assert-timeout 120s --cleanup-timeout 120s --delete-timeout 120s
 
 
 .PHONY: chainsaw-cleanup
-chainsaw-cleanup: chainsaw ## Run the chainsaw cleanup
-	make uninstall
-	make undeploy
+chainsaw-cleanup: manifests kustomize ## Run the chainsaw cleanup
+	make undeploy KUBECONFIG=$(KIND_KUBECONFIG)
