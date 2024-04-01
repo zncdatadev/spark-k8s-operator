@@ -1,0 +1,6 @@
+Schema: olm.semver
+GenerateMajorChannels: true
+GenerateMinorChannels: false
+Stable:
+  Bundles:
+  - Image: quay.io/zncdata/spark-k8s-operator-bundle:v0.0.1
