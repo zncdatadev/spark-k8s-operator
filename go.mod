@@ -3,7 +3,7 @@ module github.com/zncdata-labs/spark-k8s-operator
 go 1.21
 
 require (
-	github.com/onsi/ginkgo/v2 v2.16.0
+	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.30.0
 	github.com/zncdata-labs/operator-go v0.3.1-0.20240207065046-99c633403e4b
 	k8s.io/api v0.29.3
