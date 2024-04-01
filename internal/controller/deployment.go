@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"maps"
+
 	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
@@ -46,6 +48,9 @@ func (d *DeploymentReconciler) GetConditions() *[]metav1.Condition {
 
 // Build implements the ResourceBuilder interface
 func (d *DeploymentReconciler) Build(_ context.Context) (client.Object, error) {
+
+	podTemplate := d.getPodTemplate()
+
 	dep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      createDeploymentName(d.Instance.Name, d.GroupName),
@@ -57,21 +62,38 @@ func (d *DeploymentReconciler) Build(_ context.Context) (client.Object, error) {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: d.MergedLabels,
 			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: d.MergedLabels,
-				},
-				Spec: corev1.PodSpec{
-					SecurityContext: d.getSecurityContext(),
-					Containers: []corev1.Container{
-						d.createContainer(),
-					},
-					Volumes: d.createVolumes(),
-				},
-			},
+			Template: podTemplate,
 		},
 	}
 	return dep, nil
+}
+
+func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
+	copyedPodTemplate := d.MergedCfg.PodOverride.DeepCopy()
+	podTemplate := corev1.PodTemplateSpec{}
+
+	if copyedPodTemplate != nil {
+		podTemplate = *copyedPodTemplate
+	}
+
+	if podTemplate.ObjectMeta.Labels == nil {
+		podTemplate.ObjectMeta.Labels = make(map[string]string)
+	}
+
+	maps.Copy(podTemplate.ObjectMeta.Labels, d.MergedLabels)
+
+	if podTemplate.Spec.Containers == nil {
+		podTemplate.Spec.Containers = make([]corev1.Container, 0)
+	}
+	podTemplate.Spec.Containers = append(podTemplate.Spec.Containers, d.createContainer())
+
+	if podTemplate.Spec.Volumes == nil {
+		podTemplate.Spec.Volumes = make([]corev1.Volume, 0)
+	}
+
+	podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, d.createVolumes()...)
+
+	return podTemplate
 }
 
 // CommandOverride implement the WorkloadOverride interface
@@ -214,11 +236,6 @@ func (d *DeploymentReconciler) createVolumes() []corev1.Volume {
 
 func (d *DeploymentReconciler) getImageSpec() *sparkv1alpha1.ImageSpec {
 	return d.Instance.Spec.Image
-}
-
-// get security context
-func (d *DeploymentReconciler) getSecurityContext() *corev1.PodSecurityContext {
-	return d.MergedCfg.Config.SecurityContext
 }
 
 // get replicas

@@ -111,8 +111,8 @@ type RoleSpec struct {
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 
-	//// +kubebuilder:validation:Optional
-	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
+	// +kubebuilder:validation:Optional
+	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
 }
 
 type ConfigOverridesSpec struct {
@@ -123,9 +123,6 @@ type ConfigOverridesSpec struct {
 type ConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Resources *ResourcesSpec `json:"resources,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	SecurityContext *corev1.PodSecurityContext `json:"securityContext"`
 
 	// +kubebuilder:validation:Optional
 	Affinity *corev1.Affinity `json:"affinity"`
@@ -148,6 +145,7 @@ type ConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	History *HistorySpec `json:"history"`
 
+	// TODO: change name, this name is confused
 	// +kubebuilder:validation:Optional
 	EventLog *EventLogSpec `json:"eventLog"`
 
@@ -179,8 +177,8 @@ type RoleGroupSpec struct {
 	// +kubebuilder:validation:Optional
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 
-	//// +kubebuilder:validation:Optional
-	//PodOverride corev1.PodSpec `json:"podOverride,omitempty"`
+	// +kubebuilder:validation:Optional
+	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
 }
 
 type ListenerSpec struct {
@@ -198,7 +196,7 @@ type ListenerSpec struct {
 }
 
 type IngressSpec struct {
-	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Optionalx
 	// +kubebuilder:default:=true
 	Enabled bool `json:"enabled,omitempty"`
 
