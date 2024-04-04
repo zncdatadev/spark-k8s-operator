@@ -18,6 +18,9 @@ func NewListenerInfo(ia InstanceAttributes, resourceClient ResourceClient) *List
 }
 
 func (l *ListenerInfo[T]) GetListenerClassName() sparkv1alpha1.ListenerClass {
+	if l.InstanceAttributes.GetClusterConfig() == nil {
+		return sparkv1alpha1.ClusterInternal
+	}
 	return l.InstanceAttributes.GetClusterConfig().ListenerClass
 }
 
