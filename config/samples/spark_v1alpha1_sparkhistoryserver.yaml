@@ -41,6 +41,7 @@ spec:
             labels:
               foo: bar
         config:
+          gracefulShutdownTimeout: 10s
           logging:
             sparkHistory:
               console:

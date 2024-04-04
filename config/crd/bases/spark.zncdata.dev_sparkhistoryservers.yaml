@@ -1249,6 +1249,9 @@ spec:
                             default: pvc
                             type: string
                         type: object
+                      gracefulShutdownTimeout:
+                        description: Use time.ParseDuration to parse the string
+                        type: string
                       history:
                         properties:
                           fsCleaner:
@@ -10974,6 +10977,9 @@ spec:
                                   default: pvc
                                   type: string
                               type: object
+                            gracefulShutdownTimeout:
+                              description: Use time.ParseDuration to parse the string
+                              type: string
                             history:
                               properties:
                                 fsCleaner:

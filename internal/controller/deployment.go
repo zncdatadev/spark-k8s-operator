@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"maps"
+	"time"
 
 	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
 	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
@@ -68,12 +69,22 @@ func (d *DeploymentReconciler) Build(_ context.Context) (client.Object, error) {
 	return dep, nil
 }
 
-func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
-	copyedPodTemplate := d.MergedCfg.PodOverride.DeepCopy()
-	podTemplate := corev1.PodTemplateSpec{}
+func (d *DeploymentReconciler) getTerminationGracePeriodSeconds() *int64 {
+	if d.MergedCfg.Config.GracefulShutdownTimeout != nil {
+		if tiime, err := time.ParseDuration(*d.MergedCfg.Config.GracefulShutdownTimeout); err == nil {
+			seconds := int64(tiime.Seconds())
+			return &seconds
+		}
+	}
+	return nil
+}
 
-	if copyedPodTemplate != nil {
-		podTemplate = *copyedPodTemplate
+func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
+
+	// use podOverride if it is not nil, other value will merge into podOverride
+	podTemplate := corev1.PodTemplateSpec{}
+	if d.MergedCfg.PodOverride != nil {
+		podTemplate = *d.MergedCfg.PodOverride.DeepCopy()
 	}
 
 	if podTemplate.ObjectMeta.Labels == nil {
@@ -82,16 +93,14 @@ func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
 
 	maps.Copy(podTemplate.ObjectMeta.Labels, d.MergedLabels)
 
-	if podTemplate.Spec.Containers == nil {
-		podTemplate.Spec.Containers = make([]corev1.Container, 0)
-	}
 	podTemplate.Spec.Containers = append(podTemplate.Spec.Containers, d.createContainer())
-
-	if podTemplate.Spec.Volumes == nil {
-		podTemplate.Spec.Volumes = make([]corev1.Volume, 0)
-	}
-
 	podTemplate.Spec.Volumes = append(podTemplate.Spec.Volumes, d.createVolumes()...)
+
+	// set terminationGracePeriodSeconds, it maybe override podOverride value
+	seconds := d.getTerminationGracePeriodSeconds()
+	if d.MergedCfg.Config.GracefulShutdownTimeout != nil {
+		podTemplate.Spec.TerminationGracePeriodSeconds = seconds
+	}
 
 	return podTemplate
 }

@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: sparkhistoryserver-sample-default
+spec:
+  template:
+    spec:
+      terminationGracePeriodSeconds: 60
 status:
   availableReplicas: 1
 ---

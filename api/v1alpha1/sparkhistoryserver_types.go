@@ -134,9 +134,6 @@ type ConfigOverridesSpec struct {
 
 type ConfigSpec struct {
 	// +kubebuilder:validation:Optional
-	Resources *ResourcesSpec `json:"resources,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	Affinity *corev1.Affinity `json:"affinity"`
 
 	// +kubebuilder:validation:Optional
@@ -147,6 +144,16 @@ type ConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
+
+	// Use time.ParseDuration to parse the string
+	// +kubebuilder:validation:Optional
+	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Logging *ContainerLoggingSpec `json:"logging,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	Resources *ResourcesSpec `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	StorageClass string `json:"storageClass,omitempty"`
@@ -160,9 +167,6 @@ type ConfigSpec struct {
 	// TODO: change name, this name is confused
 	// +kubebuilder:validation:Optional
 	EventLog *EventLogSpec `json:"eventLog"`
-
-	// +kubebuilder:validation:Optional
-	Logging *ContainerLoggingSpec `json:"logging,omitempty"`
 }
 
 type PodDisruptionBudgetSpec struct {
