@@ -69,12 +69,22 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	r.Log.Info("SparkHistoryServer found", "Name", sparkHistory.Name)
+
+	if r.ReconciliationPaused(sparkHistory) {
+		r.Log.Info("Reconciliation is paused for SparkHistoryServer")
+		return ctrl.Result{}, nil
+	}
+
 	result, err := NewClusterReconciler(r.Client, r.Scheme, sparkHistory).ReconcileCluster(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	r.Log.Info("Successfully reconciled SparkHistoryServer")
 	return result, nil
+}
+
+func (r *SparkHistoryServerReconciler) ReconciliationPaused(insatnce *sparkv1alpha1.SparkHistoryServer) bool {
+	return insatnce.Spec.ClusterOperation != nil && insatnce.Spec.ClusterOperation.ReconciliationPaused
 }
 
 // SetupWithManager sets up the controller with the Manager.
