@@ -86,6 +86,10 @@ type ClusterOperationSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=false
 	ReconciliationPaused bool `json:"reconciliationPaused,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	Stopped bool `json:"stopped,omitempty"`
 }
 
 type ClusterConfigSpec struct {

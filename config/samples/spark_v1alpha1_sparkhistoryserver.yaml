@@ -13,6 +13,8 @@ spec:
     repository: bitnami/spark
     tag: 3.1.1
     pullPolicy: IfNotPresent
+  clusterOperation:
+    stopped: false
   clusterConfig:
     # listenerClass: external-unstable
     ingress:

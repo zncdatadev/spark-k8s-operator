@@ -48,7 +48,7 @@ func (d *DeploymentReconciler) GetConditions() *[]metav1.Condition {
 }
 
 // Build implements the ResourceBuilder interface
-func (d *DeploymentReconciler) Build(_ context.Context) (client.Object, error) {
+func (d *DeploymentReconciler) Build(ctx context.Context) (client.Object, error) {
 
 	podTemplate := d.getPodTemplate()
 
@@ -59,7 +59,7 @@ func (d *DeploymentReconciler) Build(_ context.Context) (client.Object, error) {
 			Labels:    d.MergedLabels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: d.getReplicas(),
+			Replicas: d.getReplicas(ctx),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: d.MergedLabels,
 			},
@@ -247,8 +247,27 @@ func (d *DeploymentReconciler) getImageSpec() *sparkv1alpha1.ImageSpec {
 	return d.Instance.Spec.Image
 }
 
+func (d *DeploymentReconciler) shouldStop(ctx context.Context) bool {
+
+	clusterOperation := common.NewClusterOperation(
+		&SparkHistoryInstance{Instance: d.Instance},
+		common.ResourceClient{
+			Ctx:       ctx,
+			Client:    d.Client,
+			Namespace: d.Instance.Namespace,
+		},
+	)
+
+	return clusterOperation.ClusterStop()
+}
+
 // get replicas
-func (d *DeploymentReconciler) getReplicas() *int32 {
+func (d *DeploymentReconciler) getReplicas(ctx context.Context) *int32 {
+	if d.shouldStop(ctx) {
+		logger.Info("Stop the cluster, set replicas to 0")
+		reps := int32(0)
+		return &reps
+	}
 	return &d.MergedCfg.Replicas
 }
 

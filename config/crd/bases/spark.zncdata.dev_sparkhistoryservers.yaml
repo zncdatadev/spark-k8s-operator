@@ -132,6 +132,9 @@ spec:
                   reconciliationPaused:
                     default: false
                     type: boolean
+                  stopped:
+                    default: false
+                    type: boolean
                 type: object
               image:
                 properties:
