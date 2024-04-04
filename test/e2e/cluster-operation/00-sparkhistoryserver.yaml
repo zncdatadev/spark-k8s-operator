@@ -7,14 +7,12 @@ metadata:
     app.kubernetes.io/part-of: spark-k8s
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: spark-k8s-operator
-  name: shs-reconcile-paused
+  name: shs
 spec:
   image:
     repository: bitnami/spark
     tag: 3.1.1
     pullPolicy: IfNotPresent
-  clusterOperation:
-    reconciliationPaused: true
   sparkHistory:
     config:
       resources:
@@ -25,7 +23,7 @@ spec:
           limit: 512Mi
     roleGroups:
       default:
-        replicas: 2
+        replicas: 1
         config:
           gracefulShutdownTimeout: 1m
           resources:

@@ -71,7 +71,7 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	logger.Info("SparkHistoryServer found", "Name", sparkHistory.Name)
+	logger.Info("SparkHistoryServer found", "Name", sparkHistory.Name, "Namespace", sparkHistory.Namespace)
 
 	if r.ReconciliationPaused(ctx, sparkHistory) {
 		logger.Info("Reconciliation is paused for SparkHistoryServer")

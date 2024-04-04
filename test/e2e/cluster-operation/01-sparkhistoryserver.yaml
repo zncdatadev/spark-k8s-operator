@@ -1,3 +1,4 @@
+# add reconciliationPaused: true, and test no change
 apiVersion: spark.zncdata.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
@@ -7,12 +8,14 @@ metadata:
     app.kubernetes.io/part-of: spark-k8s
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: spark-k8s-operator
-  name: shs-reconcile-paused
+  name: shs
 spec:
   image:
     repository: bitnami/spark
     tag: 3.1.1
     pullPolicy: IfNotPresent
+  clusterOperation:
+    reconciliationPaused: true
   sparkHistory:
     config:
       resources:
@@ -23,7 +26,7 @@ spec:
           limit: 512Mi
     roleGroups:
       default:
-        replicas: 1
+        replicas: 2
         config:
           gracefulShutdownTimeout: 1m
           resources:

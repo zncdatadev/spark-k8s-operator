@@ -1,3 +1,4 @@
+# add listenerCluster and test whether NodePort is in the service
 apiVersion: spark.zncdata.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
@@ -33,9 +34,6 @@ spec:
         enabled: true
         mountMode: pvc
         dir: /tmp
-      securityContext:
-        runAsUser: 1000
-        fsGroup: 1000
     roleGroups:
       default:
         replicas: 1

@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: shs-reconcile-paused-default
+  name: shs-default
 spec:
   replicas: 1
 status:
