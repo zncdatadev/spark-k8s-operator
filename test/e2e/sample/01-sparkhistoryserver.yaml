@@ -14,7 +14,7 @@ spec:
     tag: 3.1.1
     pullPolicy: IfNotPresent
   clusterConfig:
-    # listenerClass: external-unstable
+    listenerClass: external-unstable
     ingress:
       enabled: true
       annotations:
@@ -33,13 +33,12 @@ spec:
         enabled: true
         mountMode: pvc
         dir: /tmp
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
     roleGroups:
       default:
         replicas: 1
-        podOverride:
-          metadata:
-            labels:
-              foo: bar
         config:
           logging:
             sparkHistory:
