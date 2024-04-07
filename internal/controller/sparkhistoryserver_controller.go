@@ -19,18 +19,21 @@ package controller
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	logger = ctrl.Log.WithName("controller")
 )
 
 // SparkHistoryServerReconciler reconciles a SparkHistoryServer object
 type SparkHistoryServerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
-	Log    logr.Logger
 }
 
 //+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
@@ -55,26 +58,47 @@ type SparkHistoryServerReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
-	r.Log.Info("Reconciling SparkHistory")
+	logger.Info("Reconciling SparkHistory")
 
 	sparkHistory := &sparkv1alpha1.SparkHistoryServer{}
 
 	if err := r.Get(ctx, req.NamespacedName, sparkHistory); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			r.Log.Error(err, "unable to fetch SparkHistoryServer")
+			logger.Error(err, "unable to fetch SparkHistoryServer")
 			return ctrl.Result{}, err
 		}
-		r.Log.Info("SparkHistoryServer resource not found. Ignoring since object must be deleted")
+		logger.Info("SparkHistoryServer resource not found. Ignoring since object must be deleted")
 		return ctrl.Result{}, nil
 	}
 
-	r.Log.Info("SparkHistoryServer found", "Name", sparkHistory.Name)
+	logger.Info("SparkHistoryServer found", "Name", sparkHistory.Name, "Namespace", sparkHistory.Namespace)
+
+	if r.ReconciliationPaused(ctx, sparkHistory) {
+		logger.Info("Reconciliation is paused for SparkHistoryServer")
+		return ctrl.Result{}, nil
+	}
+
 	result, err := NewClusterReconciler(r.Client, r.Scheme, sparkHistory).ReconcileCluster(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	r.Log.Info("Successfully reconciled SparkHistoryServer")
+	logger.Info("Successfully reconciled SparkHistoryServer")
 	return result, nil
+}
+
+func (r *SparkHistoryServerReconciler) ReconciliationPaused(
+	ctx context.Context,
+	instance *sparkv1alpha1.SparkHistoryServer,
+) bool {
+	clusterOperation := common.NewClusterOperation(
+		&SparkHistoryInstance{Instance: instance},
+		common.ResourceClient{
+			Ctx:       ctx,
+			Client:    r.Client,
+			Namespace: instance.Namespace,
+		},
+	)
+	return clusterOperation.ReconciliationPaused()
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -90,4 +114,8 @@ type SparkHistoryInstance struct {
 
 func (i *SparkHistoryInstance) GetClusterConfig() *sparkv1alpha1.ClusterConfigSpec {
 	return i.Instance.Spec.ClusterConfig
+}
+
+func (i *SparkHistoryInstance) GetClusterOperation() *sparkv1alpha1.ClusterOperationSpec {
+	return i.Instance.Spec.ClusterOperation
 }

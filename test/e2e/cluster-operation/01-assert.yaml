@@ -1,0 +1,9 @@
+# Test: reconcile-paused, replicas not changed
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shs-default
+spec:
+  replicas: 1
+status:
+  availableReplicas: 1

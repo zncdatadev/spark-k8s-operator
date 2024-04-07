@@ -73,10 +73,23 @@ type SparkHistoryServerSpec struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	ClusterConfig *ClusterConfigSpec `json:"clusterConfig,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	ClusterOperation *ClusterOperationSpec `json:"clusterOperation,omitempty"`
+
 	// spark history server role spec
 	// +kubebuilder:validation:Required
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	SparkHistory *RoleSpec `json:"sparkHistory"`
+}
+
+type ClusterOperationSpec struct {
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	ReconciliationPaused bool `json:"reconciliationPaused,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=false
+	Stopped bool `json:"stopped,omitempty"`
 }
 
 type ClusterConfigSpec struct {

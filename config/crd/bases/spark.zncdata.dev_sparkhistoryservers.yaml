@@ -127,6 +127,15 @@ spec:
                     - reference
                     type: object
                 type: object
+              clusterOperation:
+                properties:
+                  reconciliationPaused:
+                    default: false
+                    type: boolean
+                  stopped:
+                    default: false
+                    type: boolean
+                type: object
               image:
                 properties:
                   pullPolicy:

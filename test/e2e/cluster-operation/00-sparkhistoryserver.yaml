@@ -7,20 +7,12 @@ metadata:
     app.kubernetes.io/part-of: spark-k8s
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: spark-k8s-operator
-  name: sparkhistoryserver-sample
+  name: shs
 spec:
   image:
     repository: bitnami/spark
     tag: 3.1.1
     pullPolicy: IfNotPresent
-  clusterConfig:
-    listenerClass: external-unstable
-    ingress:
-      enabled: true
-      annotations:
-        kubernetes.io/ingress.class: nginx
-        nginx.ingress.kubernetes.io/rewrite-target: /
-      host: spark-history.example.com
   sparkHistory:
     config:
       resources:
@@ -29,21 +21,11 @@ spec:
           max: 200m
         memory:
           limit: 512Mi
-      eventLog:
-        enabled: true
-        mountMode: pvc
-        dir: /tmp
-      securityContext:
-        runAsUser: 1000
-        fsGroup: 1000
     roleGroups:
       default:
         replicas: 1
         config:
-          logging:
-            sparkHistory:
-              console:
-                level: "INFO"
+          gracefulShutdownTimeout: 1m
           resources:
             cpu:
               min: 300m

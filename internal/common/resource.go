@@ -34,4 +34,5 @@ func (r *ResourceClient) Get(obj client.Object) error {
 
 type InstanceAttributes interface {
 	GetClusterConfig() *sparkv1alpha1.ClusterConfigSpec
+	GetClusterOperation() *sparkv1alpha1.ClusterOperationSpec
 }

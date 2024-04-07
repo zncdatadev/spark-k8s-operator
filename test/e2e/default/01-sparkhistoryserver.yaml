@@ -1,3 +1,4 @@
+# add listenerCluster and test whether NodePort is in the service
 apiVersion: spark.zncdata.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
@@ -13,10 +14,8 @@ spec:
     repository: bitnami/spark
     tag: 3.1.1
     pullPolicy: IfNotPresent
-  clusterOperation:
-    stopped: false
   clusterConfig:
-    # listenerClass: external-unstable
+    listenerClass: external-unstable
     ingress:
       enabled: true
       annotations:
@@ -38,12 +37,7 @@ spec:
     roleGroups:
       default:
         replicas: 1
-        podOverride:
-          metadata:
-            labels:
-              foo: bar
         config:
-          gracefulShutdownTimeout: 10s
           logging:
             sparkHistory:
               console:
