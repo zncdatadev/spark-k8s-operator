@@ -32,7 +32,7 @@ PROJECT_NAME = spark-k8s-operator
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # zncdata.dev/spark-k8s-operator-bundle:$VERSION and zncdata.dev/spark-k8s-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= $(REGISTRY)/$(PROJECT_NAME)
+IMAGE_TAG_BASE ?= $(REGISTRY)/v$(PROJECT_NAME)
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -56,7 +56,8 @@ OPERATOR_SDK_VERSION ?= v1.33.0
 # Image URL to use all building/pushing image targets
 IMG ?= $(REGISTRY)/spark-k8s-operator:v$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION ?= 1.26.14
+# ref: https://github.com/kubernetes-sigs/kubebuilder/releases in v3.11.0-v3.14.1 ENVTEST_K8S_VERSION support 1.26.1 and 1.27.1
+ENVTEST_K8S_VERSION ?= 1.26.1
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -330,8 +331,12 @@ catalog-docker-buildx: ## Build and push a catalog image for cross-platform supp
 # kind
 KIND_VERSION ?= v0.22.0
 
-KIND_KUBECONFIG ?= ./kind-kubeconfig
-KIND_CLUSTER_NAME ?= ${PROJECT_NAME}
+KINDTEST_K8S_VERSION ?= 1.26.14
+
+KIND_IMAGE ?= kindest/node:v${KINDTEST_K8S_VERSION}
+
+KIND_KUBECONFIG ?= ./kind-kubeconfig-$(KINDTEST_K8S_VERSION) 
+KIND_CLUSTER_NAME ?= ${PROJECT_NAME}-$(KINDTEST_K8S_VERSION) 
 
 .PHONY: kind
 KIND = $(LOCALBIN)/kind
@@ -353,7 +358,7 @@ OLM_VERSION ?= v0.27.0
 # Create a kind cluster, install ingress-nginx, and wait for it to be available.
 .PHONY: kind-create
 kind-create: kind ## Create a kind cluster.
-	$(KIND) create cluster --config test/e2e/kind-$(ENVTEST_K8S_VERSION).yaml --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
+	$(KIND) create cluster --config test/e2e/kind-config.yaml --image $(KIND_IMAGE) --name $(KIND_CLUSTER_NAME) --kubeconfig $(KIND_KUBECONFIG) --wait 120s
 	make kind-setup KUBECONFIG=$(KIND_KUBECONFIG)
 
 .PHONY: kind-setup
