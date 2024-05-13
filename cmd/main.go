@@ -101,7 +101,7 @@ func main() {
 			"the manager will watch and manage resources in all namespaces")
 	}
 
-	var cachedNamespaces map[string]cache.Config
+	cachedNamespaces := make(map[string]cache.Config)
 
 	if len(watchNamespaces) > 0 {
 		setupLog.Info("watchNamespaces", "namespaces", watchNamespaces)
@@ -111,7 +111,6 @@ func main() {
 		}
 	} else {
 		setupLog.Info("watchNamespaces", "namespaces", "all")
-		cachedNamespaces = map[string]cache.Config{cache.AllNamespaces: {}}
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{

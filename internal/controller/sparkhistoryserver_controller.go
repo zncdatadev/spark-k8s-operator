@@ -36,9 +36,9 @@ type SparkHistoryServerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
@@ -81,7 +81,10 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	result, err := NewClusterReconciler(r.Client, r.Scheme, sparkHistory).ReconcileCluster(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
+	} else if result.Requeue || result.RequeueAfter > 0 {
+		return result, nil
 	}
+
 	logger.Info("Successfully reconciled SparkHistoryServer")
 	return result, nil
 }
