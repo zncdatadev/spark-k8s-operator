@@ -307,9 +307,9 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:latest
 catalog-build: opm ## Build a catalog manifests.
 	mkdir -p catalog
 	@if ! test -f ./catalog.Dockerfile; then \
-		opm generate dockerfile catalog; \
+		$(OPM) generate dockerfile catalog; \
 	fi
-	opm alpha render-template basic -o yaml catalog-template.yaml > catalog/catalog.yaml
+	$(OPM) alpha render-template basic -o yaml catalog-template.yaml > catalog/catalog.yaml
 
 .PHONY: catalog-docker-build
 catalog-docker-build: ## Build a catalog image.
@@ -403,7 +403,7 @@ chainsaw-setup: manifests kustomize ## Run the chainsaw setup
 	@echo "\nSetup chainsaw test environment"
 	make docker-build
 	$(KIND) --name $(KIND_CLUSTER_NAME) load docker-image $(IMG)
-	make deploy KUBECONFIG=$(KIND_KUBECONFIG)
+	KUBECONFIG=$(KIND_KUBECONFIG) make deploy
 
 .PHONY: chainsaw-test
 chainsaw-test: chainsaw ## Run the chainsaw test
@@ -412,4 +412,4 @@ chainsaw-test: chainsaw ## Run the chainsaw test
 
 .PHONY: chainsaw-cleanup
 chainsaw-cleanup: manifests kustomize ## Run the chainsaw cleanup
-	make undeploy KUBECONFIG=$(KIND_KUBECONFIG)
+	KUBECONFIG=$(KIND_KUBECONFIG) make undeploy
