@@ -307,9 +307,9 @@ CATALOG_IMG ?= $(IMAGE_TAG_BASE)-catalog:latest
 catalog-build: opm ## Build a catalog manifests.
 	mkdir -p catalog
 	@if ! test -f ./catalog.Dockerfile; then \
-		opm generate dockerfile catalog; \
+		$(OPM) generate dockerfile catalog; \
 	fi
-	opm alpha render-template basic -o yaml catalog-template.yaml > catalog/catalog.yaml
+	$(OPM) alpha render-template basic -o yaml catalog-template.yaml > catalog/catalog.yaml
 
 .PHONY: catalog-docker-build
 catalog-docker-build: ## Build a catalog image.
