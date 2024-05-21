@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
-	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
-	"github.com/zncdata-labs/spark-k8s-operator/internal/util"
+	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdatadev/spark-k8s-operator/internal/common"
+	"github.com/zncdatadev/spark-k8s-operator/internal/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

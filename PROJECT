@@ -10,7 +10,7 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: spark-k8s-operator
-repo: github.com/zncdata-labs/spark-k8s-operator
+repo: github.com/zncdatadev/spark-k8s-operator
 resources:
 - api:
     crdVersion: v1
@@ -19,6 +19,6 @@ resources:
   domain: zncdata.dev
   group: spark
   kind: SparkHistoryServer
-  path: github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1
+  path: github.com/zncdatadev/spark-k8s-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

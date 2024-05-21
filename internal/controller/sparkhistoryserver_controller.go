@@ -1,5 +1,5 @@
 /*
-Copyright 2023 zncdata-labs.
+Copyright 2023 zncdatadev.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package controller
 import (
 	"context"
 
-	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
-	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
+	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdatadev/spark-k8s-operator/internal/common"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

@@ -5,8 +5,8 @@ import (
 	"maps"
 	"time"
 
-	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
-	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
+	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdatadev/spark-k8s-operator/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

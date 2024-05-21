@@ -77,7 +77,7 @@ spec:
   - name: Spark Website
     url: https://spark.apache.org/
   - name: Repository
-    url: https://github.com/zncdata-labs/spark-k8s-operator
+    url: https://github.com/zncdatadev/spark-k8s-operator
   - name: icon
     url: https://spark.apache.org/favicon.ico
   maintainers:
@@ -85,6 +85,6 @@ spec:
     name: wanghuagang
   maturity: alpha
   provider:
-    name: zncdata-labs
-    url: https://github.com/zncdata-labs
+    name: zncdatadev
+    url: https://github.com/zncdatadev
   version: 0.0.0
