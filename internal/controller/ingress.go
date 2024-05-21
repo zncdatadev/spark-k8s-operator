@@ -3,8 +3,8 @@ package controller
 import (
 	"context"
 
-	sparkv1alpha1 "github.com/zncdata-labs/spark-k8s-operator/api/v1alpha1"
-	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
+	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdatadev/spark-k8s-operator/internal/common"
 	v1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

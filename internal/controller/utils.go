@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/zncdata-labs/spark-k8s-operator/internal/common"
+	"github.com/zncdatadev/spark-k8s-operator/internal/common"
 )
 
 const (

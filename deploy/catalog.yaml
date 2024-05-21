@@ -7,7 +7,7 @@ spec:
   sourceType: grpc
   image: registry.cn-shanghai.aliyuncs.com/huagang/spark-k8s-operator-catalog:latest
   displayName: spark-k8s-operator-catalog
-  publisher: zncdata-labs
+  publisher: zncdatadev
   updateStrategy:
     registryPoll:
       interval: 20m

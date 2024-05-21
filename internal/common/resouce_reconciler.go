@@ -2,8 +2,8 @@ package common
 
 import (
 	"context"
-	opgostatus "github.com/zncdata-labs/operator-go/pkg/status"
-	"github.com/zncdata-labs/spark-k8s-operator/internal/util"
+	opgostatus "github.com/zncdatadev/operator-go/pkg/status"
+	"github.com/zncdatadev/spark-k8s-operator/internal/util"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
