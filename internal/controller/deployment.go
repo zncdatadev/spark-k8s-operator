@@ -105,6 +105,15 @@ func (d *DeploymentReconciler) getPodTemplate() corev1.PodTemplateSpec {
 	return podTemplate
 }
 
+func (d *DeploymentReconciler) SetAffinity(resource client.Object) {
+	dep := resource.(*appsv1.Deployment)
+	if affinity := d.MergedCfg.Config.Affinity; affinity != nil {
+		dep.Spec.Template.Spec.Affinity = affinity
+	} else {
+		dep.Spec.Template.Spec.Affinity = common.AffinityDefault(common.HistoryServer, d.Instance.GetName())
+	}
+}
+
 // CommandOverride implement the WorkloadOverride interface
 func (d *DeploymentReconciler) CommandOverride(resource client.Object) {
 	dep := resource.(*appsv1.Deployment)
