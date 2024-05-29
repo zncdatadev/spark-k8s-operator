@@ -4,6 +4,7 @@ import (
 	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ResourceNameGenerator struct {
@@ -75,6 +76,27 @@ func ConvertToResourceRequirements(resources *sparkv1alpha1.ResourcesSpec) *core
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    cpuMin,
 			corev1.ResourceMemory: memoryLimit,
+		},
+	}
+}
+
+func AffinityDefault(role Role, crName string) *corev1.Affinity {
+	return &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+				{
+					Weight: 70,
+					PodAffinityTerm: corev1.PodAffinityTerm{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								LabelCrName:    crName,
+								LabelComponent: string(role),
+							},
+						},
+						TopologyKey: corev1.LabelHostname,
+					},
+				},
+			},
 		},
 	}
 }
