@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+status:
+  readyReplicas: 1
+  aliveReplicas: 1
+  replicas: 1

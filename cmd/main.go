@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
-	"github.com/zncdatadev/spark-k8s-operator/internal/controller"
+	"github.com/zncdatadev/spark-k8s-operator/internal/controller/historyserver"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -137,7 +137,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.SparkHistoryServerReconciler{
+	if err = (&historyserver.SparkHistoryServerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

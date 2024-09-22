@@ -1,0 +1,38 @@
+apiVersion: spark.zncdata.dev/v1alpha1
+kind: SparkHistoryServer
+metadata:
+  name: sparkhistory
+spec:
+  clusterConfig:
+    listenerClass: cluster-internal
+    logFileDirectory:
+      s3:
+        prefix: events
+        bucket:
+          inline:
+            bucketName: spark-history
+            connection:
+              inline:
+                credentials:
+                  secretClass: spark-s3-credentials
+                host: (join('', ['minio.', ($namespace), '.svc.cluster.local']))
+                port: 9000
+                pathStyle: true
+  node:
+    config:
+      resources:
+        cpu:
+          min: 100m
+          max: 200m
+        memory:
+          limit: 512Mi
+    roleGroups:
+      default:
+        replicas: 1
+        config:
+          resources:
+            cpu:
+              min: 300m
+              max: 400m
+            memory:
+              limit: 612Mi

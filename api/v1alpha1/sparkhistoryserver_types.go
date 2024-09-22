@@ -17,20 +17,18 @@ limitations under the License.
 package v1alpha1
 
 import (
+	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
+	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/status"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TODO: move ListenerClass and impl logic to listener project
-// Finnaly, we should use it from operator-go project
-type ListenerClass string
-
 const (
-	ClusterInternal  ListenerClass = "cluster-internal"
-	ExternalUnstable ListenerClass = "external-unstable"
-	ExternalStable   ListenerClass = "external-stable"
+	DefaultRepository      = "quay.io/zncdatadev"
+	DefaultProductVersion  = "3.5.1"
+	DefaultKubedoopVersion = "0.0.0-dev"
+	DefaultProductName     = "spark-k8s"
 )
 
 // https://book.kubebuilder.io/reference/generating-crd
@@ -74,58 +72,76 @@ type SparkHistoryServerSpec struct {
 	ClusterConfig *ClusterConfigSpec `json:"clusterConfig,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	ClusterOperation *ClusterOperationSpec `json:"clusterOperation,omitempty"`
+	ClusterOperation *commonsv1alpha1.ClusterOperationSpec `json:"clusterOperation,omitempty"`
 
 	// spark history server role spec
 	// +kubebuilder:validation:Required
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	SparkHistory *RoleSpec `json:"sparkHistory"`
-}
-
-type ClusterOperationSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
-	ReconciliationPaused bool `json:"reconciliationPaused,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
-	Stopped bool `json:"stopped,omitempty"`
+	Node *RoleSpec `json:"node"`
 }
 
 type ClusterConfigSpec struct {
+
 	// +kubebuilder:validation:Optional
-	S3Bucket *S3BucketSpec `json:"s3Bucket,omitempty"`
+	LogFileDirectory *LogFileDirectorySpec `json:"logFileDirectory,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
-	ListenerClass ListenerClass `json:"listenerClass,omitempty"`
+	ListenerClass string `json:"listenerClass,omitempty"`
+}
+
+type LogFileDirectorySpec struct {
+	// +kubebuilder:validation:Required
+	S3 *S3Spec `json:"s3"`
+}
+
+type S3Spec struct {
+	// +kubebuilder:validation:Required
+	Bucket *S3BucketSpec `json:"bucket"`
+
+	// +kubebuilder:validation:Required
+	Prefix string `json:"prefix"`
+}
+
+type S3BucketSpec struct {
+	// +kubebuilder:validation:Optional
+	Inline *s3v1alpha1.S3BucketSpec `json:"inline,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Ingress *IngressSpec `json:"ingress,omitempty"`
+	Reference string `json:"reference,omitempty"`
 }
 
 type ImageSpec struct {
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=docker.io/apache/hive
-	Repository string `json:"repository,omitempty"`
+	// +kubebuilder:validation:Optional
+	Custom string `json:"custom,omitempty"`
 
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default="4.0.0-beta-1"
-	Tag string `json:"tag,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=quay.io/zncdatadev
+	Repo string `json:"repo,omitempty"`
 
-	// +kubebuilder:validation:Enum=Always;Never;IfNotPresent
-	// +kubebuilder:default=IfNotPresent
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="0.0.0-dev"
+	KubedoopVersion string `json:"kubedoopVersion,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="3.5.1"
+	ProductVersion string `json:"productVersion,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=IfNotPresent
 	PullPolicy corev1.PullPolicy `json:"pullPolicy,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	PullSecretName string `json:"pullSecretName,omitempty"`
 }
+
 type RoleSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Config *ConfigSpec `json:"config,omitempty"`
 
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
-
-	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
@@ -137,7 +153,7 @@ type RoleSpec struct {
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
+	PodOverrides *PodOverridesSpec `json:"podOverrides,omitempty"`
 }
 
 type ConfigOverridesSpec struct {
@@ -150,12 +166,6 @@ type ConfigSpec struct {
 	Affinity *corev1.Affinity `json:"affinity"`
 
 	// +kubebuilder:validation:Optional
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Tolerations []corev1.Toleration `json:"tolerations"`
-
-	// +kubebuilder:validation:Optional
 	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 
 	// Use time.ParseDuration to parse the string
@@ -163,23 +173,13 @@ type ConfigSpec struct {
 	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Logging *ContainerLoggingSpec `json:"logging,omitempty"`
+	Logging *LoggingSpec `json:"logging,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Resources *ResourcesSpec `json:"resources,omitempty"`
+	Resources *commonsv1alpha1.ResourcesSpec `json:"resources,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	StorageClass string `json:"storageClass,omitempty"`
-
-	// +kubebuilder:default="10Gi"
-	StorageSize string `json:"size,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	History *HistorySpec `json:"history"`
-
-	// TODO: change name, this name is confused
-	// +kubebuilder:validation:Optional
-	EventLog *EventLogSpec `json:"eventLog"`
+	Cleaner *bool `json:"cleaner,omitempty"`
 }
 
 type PodDisruptionBudgetSpec struct {
@@ -198,7 +198,7 @@ type RoleGroupSpec struct {
 	Config *ConfigSpec `json:"config,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	CommandArgsOverrides []string `json:"commandArgsOverrides,omitempty"`
+	CommandOverrides []string `json:"commandOverrides,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
@@ -207,123 +207,12 @@ type RoleGroupSpec struct {
 	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	PodOverride *corev1.PodTemplateSpec `json:"podOverride,omitempty"`
+	PodOverrides *PodOverridesSpec `json:"podOverrides,omitempty"`
 }
 
-type IngressSpec struct {
-	// +kubebuilder:validation:Optionalx
-	// +kubebuilder:default:=true
-	Enabled bool `json:"enabled,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	TLS *networkingv1.IngressTLS `json:"tls,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="spark-history-server.example.com"
-	Host string `json:"host,omitempty"`
-}
-
-type S3BucketSpec struct {
-	// S3 bucket name with S3Bucket
-	// +kubebuilder:validation=Optional
-	Reference *string `json:"reference"`
-
-	// +kubebuilder:validation=Optional
-	Inline *S3BucketInlineSpec `json:"inline,omitempty"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=20
-	MaxConnect int `json:"maxConnect"`
-
-	// +kubebuilder:validation=Optional
-	PathStyleAccess bool `json:"pathStyle_access"`
-}
-
-type S3BucketInlineSpec struct {
-
-	// +kubeBuilder:validation=Required
-	Bucket string `json:"bucket"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default="us-east-1"
-	Region string `json:"region,omitempty"`
-
-	// +kubebuilder:validation=Required
-	Endpoints string `json:"endpoints"`
-
-	// +kubebuilder:validation=Optional
-	// +kubebuilder:default=false
-	SSL bool `json:"ssl,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=false
-	PathStyle bool `json:"pathStyle,omitempty"`
-
-	// +kubebuilder:validation=Optional
-	AccessKey string `json:"accessKey,omitempty"`
-
-	// +kubebuilder:validation=Optional
-	SecretKey string `json:"secretKey,omitempty"`
-}
-
-type HistorySpec struct {
-	// +kubebuilder:validation:Optional
-	FsCleaner *FsCleanerSpec `json:"fsCleaner"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=20
-	FsEnentLogRollingMaxFiles int32 `json:"fsEnentLogRollingMaxFiles"`
-}
-
-type FsCleanerSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=true
-	Enabled bool `json:"enabled,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:=50
-	MaxNum int32 `json:"maxNum,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="7d"
-	MaxAge string `json:"maxAge,omitempty"`
-}
-
-type EventLogSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="/tmp/spark-events"
-	Dir string `json:"dir,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:="pvc"
-	MountMode string `json:"mountMode,omitempty"`
-
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default:=false
-	Enabled bool `json:"enabled,omitempty"`
+type PodOverridesSpec struct {
 }
 
 func init() {
 	SchemeBuilder.Register(&SparkHistoryServer{}, &SparkHistoryServerList{})
-}
-
-func (r *SparkHistoryServer) GetNameWithSuffix(suffix string) string {
-	// return sparkHistory.GetName() + rand.String(5) + suffix
-	return r.GetName() + "-" + suffix
-}
-
-// SetStatusCondition updates the status condition using the provided arguments.
-// If the condition already exists, it updates the condition; otherwise, it appends the condition.
-// If the condition status has changed, it updates the condition's LastTransitionTime.
-func (r *SparkHistoryServer) SetStatusCondition(condition metav1.Condition) {
-	r.Status.SetStatusCondition(condition)
-}
-
-// InitStatusConditions initializes the status conditions to the provided conditions.
-func (r *SparkHistoryServer) InitStatusConditions() {
-	r.Status.InitStatus(r)
-	r.Status.InitStatusConditions()
 }

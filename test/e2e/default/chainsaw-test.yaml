@@ -1,0 +1,54 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: default
+spec:
+  bindings:
+  - name: MINIO_USER
+    value: miniouser
+  - name: MINIO_PASSWORD
+    value: miniouserpassword
+  - name: MINIO_BUCKET
+    value: spark-history
+  steps:
+  - try:
+    - apply:
+        file: ../setup/olm.yaml
+    - assert:
+        file: ../setup/olm-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/subs.yaml
+    - assert:
+        file: ../setup/subs-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/listener-csi.yaml
+    - assert:
+        file: ../setup/listenercsi-assert.yaml
+    - apply:
+        file: ../setup/secret-csi.yaml
+    - assert:
+        file: ../setup/secretcsi-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 5s
+  - try:
+    - apply:
+        file: ../setup/minio.yaml
+    - apply:
+        file: ../setup/minio-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/spark-s3-credentials.yaml
+    - assert:
+        file: ../setup/spark-s3-credentials-assert.yaml
+  - try:
+    - apply:
+        file: sparkhistoryserver.yaml
+  - try:
+    - assert:
+        file: sparkhistoryserver-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 5s
