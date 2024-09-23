@@ -83,13 +83,11 @@ spec:
   - try:
     - apply:
         file: sparkhistoryserver.yaml
-    - sleep:
-        duration: 60s
     - assert:
         file: sparkhistoryserver-assert.yaml
     cleanup:
     - sleep:
-        duration: 5s
+        duration: 60s
     catch:
       - sleep:
           duration: 5s
