@@ -47,7 +47,7 @@ spec:
         file: ../setup/s3bucket.yaml
     cleanup:
     - sleep:
-        duration: 10s
+        duration: 60s
   - try:
     - apply:
         file: sparkhistoryserver.yaml

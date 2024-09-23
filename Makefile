@@ -374,7 +374,7 @@ kind-delete: kind ## Delete a kind cluster.
 
 # chainsaw
 
-CHAINSAW_VERSION ?= v0.2.8
+CHAINSAW_VERSION ?= v0.2.10
 CHAINSAW = $(LOCALBIN)/chainsaw
 
 .PHONY: chainsaw

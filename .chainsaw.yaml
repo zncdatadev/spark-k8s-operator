@@ -13,3 +13,23 @@ spec:
   skipDelete: false
   failFast: true
   parallel: 1
+  forceTerminationGracePeriod: 10s
+  catch:
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+        content: |
+          set -ex
+          kubectl -n $NAMESPACE get pods
+
+          POD_NAME=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/instance=sparkhistory -o jsonpath='{.items[0].metadata.name}')
+
+          if [ -n "$POD_NAME" ]; then
+            echo "Pod $POD_NAME is running, force delete it"
+            kubectl -n $NAMESPACE delete pod $POD_NAME --grace-period=0 --force
+          fi
+          
+          kubectl -n $NAMESPACE get pvc
+          kubectl -n $NAMESPACE get pv
+          kubectl -n $NAMESPACE get pv | grep chainsaw | awk '{print $1}' | xargs kubectl patch pv -p '{"metadata":{"finalizers":null}}'
