@@ -40,9 +40,6 @@ spec:
         file: ../setup/secret-csi.yaml
     - assert:
         file: ../setup/secretcsi-assert.yaml
-    cleanup:
-    - sleep:
-        duration: 30s
   - try:
     - apply:
         file: ../setup/minio.yaml
@@ -83,8 +80,15 @@ spec:
         file: oidc-credentials.yaml
     - apply:
         file: authenticationclass.yaml
+    cleanup:
+    - sleep:
+        duration: 10s
   - try:
     - apply:
         file: sparkhistoryserver.yaml
+  - try:
     - assert:
         file: sparkhistoryserver-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 5s
