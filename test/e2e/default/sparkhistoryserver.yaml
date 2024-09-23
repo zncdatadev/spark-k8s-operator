@@ -11,20 +11,6 @@ spec:
         bucket:
           reference: spark-history
   node:
-    config:
-      resources:
-        cpu:
-          min: 100m
-          max: 200m
-        memory:
-          limit: 512Mi
     roleGroups:
       default:
         replicas: 1
-        config:
-          resources:
-            cpu:
-              min: 300m
-              max: 400m
-            memory:
-              limit: 612Mi
