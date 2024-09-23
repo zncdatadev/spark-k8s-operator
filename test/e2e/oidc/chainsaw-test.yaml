@@ -87,6 +87,8 @@ spec:
     - apply:
         file: sparkhistoryserver.yaml
   - try:
+    - sleep:
+        duration: 10s
     - assert:
         file: sparkhistoryserver-assert.yaml
     cleanup:
@@ -108,5 +110,4 @@ spec:
           selector: app.kubernetes.io/instance=sparkhistory
       - podLogs:
           selector: app.kubernetes.io/instance=sparkhistory
-          container: csi-secrets
           tail: -1
