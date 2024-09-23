@@ -15,18 +15,15 @@ func ProductLogging(
 ) {
 	var containerLoging *commonsv1alph1.LoggingConfigSpec
 	if logging != nil {
-		for container, logConfig := range logging.Containers {
-			if container == containerName {
-				containerLoging = &logConfig
-				break
-			}
+		if o, ok := logging.Containers[containerName]; ok {
+			containerLoging = &o
 		}
 	}
 
 	log4j2Config := productlogging.NewLog4j2ConfigGenerator(
 		containerLoging,
 		containerName,
-		productlogging.DefaultLog4j2ConversionPattern,
+		"%d{ISO8601} %p [%t] %c - %m%n",
 		nil,
 		"spark.log4j2.xml",
 		"",

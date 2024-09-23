@@ -66,7 +66,9 @@ func (r *ClusterReconciler) RegisterResource(ctx context.Context) error {
 		r.GetImage(),
 		r.Spec.Node,
 	)
-	node.RegisterResources(ctx)
+	if err := node.RegisterResources(ctx); err != nil {
+		return err
+	}
 
 	r.AddResource(node)
 

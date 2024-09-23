@@ -27,8 +27,6 @@ const (
 )
 
 // TODO: Add the tls verification
-// TODO: add s3 connection inline
-
 type S3BucketConnect struct {
 	Endpoint   url.URL
 	Bucket     string
@@ -62,8 +60,8 @@ func GetInlineS3Bucket(ctx context.Context, client *client.Client, s3Bucket *v1a
 	refConnection := s3Bucket.Connection.Reference
 	s3ConnectionSpec := s3Bucket.Connection.Inline
 	if refConnection != "" {
-		s3Connection := &v1alpha1.S3Connection{}
-		if err := client.GetWithOwnerNamespace(ctx, refConnection, s3Connection); err != nil {
+		s3Connection, err := GetRefreenceS3Connection(ctx, client, refConnection)
+		if err != nil {
 			return nil, err
 		}
 		s3ConnectionSpec = &s3Connection.Spec
@@ -91,7 +89,6 @@ func GetRefreenceS3Connection(ctx context.Context, client *client.Client, name s
 	if err := client.GetWithOwnerNamespace(ctx, name, s3Connection); err != nil {
 		return nil, err
 	}
-
 	return s3Connection, nil
 }
 

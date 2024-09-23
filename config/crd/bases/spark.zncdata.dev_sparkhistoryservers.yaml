@@ -47,6 +47,30 @@ spec:
               clusterConfig:
                 description: spark history server cluster config
                 properties:
+                  authentication:
+                    properties:
+                      authenticationClass:
+                        type: string
+                      oidc:
+                        description: OidcSpec defines the OIDC spec.
+                        properties:
+                          clientCredentialsSecret:
+                            description: |-
+                              OIDC client credentials secret. It must contain the following keys:
+                                - `CLIENT_ID`: The client ID of the OIDC client.
+                                - `CLIENT_SECRET`: The client secret of the OIDC client.
+                              credentials will omit to pod environment variables.
+                            type: string
+                          extraScopes:
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - clientCredentialsSecret
+                        type: object
+                    required:
+                    - authenticationClass
+                    type: object
                   listenerClass:
                     default: cluster-internal
                     enum:

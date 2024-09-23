@@ -39,6 +39,23 @@ rules:
   - update
   - watch
 - apiGroups:
+  - authentication.zncdata.dev
+  resources:
+  - authenticationclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - s3.zncdata.dev
+  resources:
+  - s3buckets
+  - s3connections
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - spark.zncdata.dev
   resources:
   - sparkhistoryservers

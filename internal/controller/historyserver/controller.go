@@ -47,6 +47,9 @@ type SparkHistoryServerReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups=authentication.zncdata.dev,resources=authenticationclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3connections,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3buckets,verbs=get;list;watch
 
 func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 

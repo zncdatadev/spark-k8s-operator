@@ -131,12 +131,16 @@ spec:
               - |
                 set -e
                 # check policy count > 1
-                policy_count=$(mc admin policy entities --user foo minio | wc -l)
-                if [ $policy_count -eq 1 ]; then
-                    exit 1
-                else
+                policy_count=$(mc admin policy entities --user ${MINIO_USER} minio | wc -l)
+                if [ $policy_count -ge 1 ]; then
                     exit 0
+                else
+                    echo "policy count: $policy_count"
+                    exit 1
                 fi
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
       volumes:
       - name: minio-storage
         emptyDir: {}

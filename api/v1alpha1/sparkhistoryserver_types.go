@@ -81,6 +81,8 @@ type SparkHistoryServerSpec struct {
 }
 
 type ClusterConfigSpec struct {
+	// +kubebuilder:validation:Optional
+	Authentication *AuthenticationSpec `json:"authentication,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	LogFileDirectory *LogFileDirectorySpec `json:"logFileDirectory,omitempty"`
@@ -89,6 +91,27 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
 	ListenerClass string `json:"listenerClass,omitempty"`
+}
+
+type AuthenticationSpec struct {
+	// +kubebuilder:validation:Required
+	AuthenticationClass string `json:"authenticationClass"`
+
+	// +kubebuilder:validation:Optional
+	Oidc *OidcSpec `json:"oidc,omitempty"`
+}
+
+// OidcSpec defines the OIDC spec.
+type OidcSpec struct {
+	// OIDC client credentials secret. It must contain the following keys:
+	//   - `CLIENT_ID`: The client ID of the OIDC client.
+	//   - `CLIENT_SECRET`: The client secret of the OIDC client.
+	// credentials will omit to pod environment variables.
+	// +kubebuilder:validation:Required
+	ClientCredentialsSecret string `json:"clientCredentialsSecret"`
+
+	// +kubebuilder:validation:Optional
+	ExtraScopes []string `json:"extraScopes,omitempty"`
 }
 
 type LogFileDirectorySpec struct {

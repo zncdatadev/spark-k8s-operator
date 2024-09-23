@@ -14,10 +14,16 @@ import (
 )
 
 var (
-	Ports = []corev1.ContainerPort{
+	SparkHistoryPorts = []corev1.ContainerPort{
 		{
 			Name:          "http",
-			ContainerPort: 8088,
+			ContainerPort: 18080,
+		},
+	}
+	OidcPorts = []corev1.ContainerPort{
+		{
+			Name:          "oidc",
+			ContainerPort: 4180,
 		},
 	}
 )
@@ -86,7 +92,7 @@ func (r *NodeRoleReconciler) GetImageResourceWithRoleGroup(ctx context.Context, 
 		r.Client,
 		info,
 		r.ClusterConfig,
-		Ports,
+		SparkHistoryPorts,
 		r.Image,
 		r.ClusterStopped,
 		spec,
@@ -98,7 +104,7 @@ func (r *NodeRoleReconciler) GetImageResourceWithRoleGroup(ctx context.Context, 
 	svc := reconciler.NewServiceReconciler(
 		r.Client,
 		info.GetFullName(),
-		Ports,
+		append(SparkHistoryPorts, OidcPorts...),
 		func(sbo *builder.ServiceBuilderOption) {
 			sbo.Labels = info.GetLabels()
 			sbo.Annotations = info.GetAnnotations()

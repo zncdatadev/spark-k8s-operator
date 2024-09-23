@@ -5,6 +5,10 @@ metadata:
 spec:
   clusterConfig:
     listenerClass: cluster-internal
+    authentication:
+      authenticationClass: oidc
+      oidc:
+        clientCredentialsSecret: oidc-credentials
     logFileDirectory:
       s3:
         prefix: events
