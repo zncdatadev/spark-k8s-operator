@@ -40,6 +40,9 @@ spec:
         file: ../setup/secret-csi.yaml
     - assert:
         file: ../setup/secretcsi-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 30s
   - try:
     - apply:
         file: ../setup/minio.yaml
@@ -49,7 +52,7 @@ spec:
     - apply:
         file: ../setup/spark-s3-credentials.yaml
     - assert:
-        file: ../setup/spark-s3-credentials.yaml
+        file: ../setup/spark-s3-credentials-assert.yaml
     - apply:
         file: ../setup/s3bucket.yaml
     - assert:
@@ -85,18 +88,3 @@ spec:
         file: sparkhistoryserver.yaml
     - assert:
         file: sparkhistoryserver-assert.yaml
-    cleanup:
-    - sleep:
-        duration: 30s
-    - script:
-        env:
-          - name: NAMESPACE
-            value: ($namespace)
-        content: |
-          # check pod 
-          POD_NAME=$(kubectl -n $NAMESPACE get pod -l app.kubernetes.io/instance=sparkhistory -o jsonpath='{.items[0].metadata.name}')
-
-          if [ -n "$POD_NAME" ]; then
-            echo "Pod $POD_NAME is running, force delete it"
-            kubectl -n $NAMESPACE delete pod $POD_NAME --grace-period=0 --force
-          fi

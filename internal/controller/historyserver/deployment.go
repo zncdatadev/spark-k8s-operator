@@ -99,15 +99,21 @@ echo ""
 	return util.IndentTab4Spaces(args)
 }
 
-func (b *DeploymentBuilder) getMainContainerEnvVars() map[string]string {
+func (b *DeploymentBuilder) getMainContainerEnvVars() []corev1.EnvVar {
 	jvmOpts := []string{
 		"-Dlog4j.configurationFile=" + path.Join(constants.KubedoopConfigDir, "log4j2.properties"),
 		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar=8090:"+path.Join(constants.KubedoopJmxDir, "config.yaml")),
 	}
 
-	envVars := map[string]string{
-		"SPARK_NO_DAEMONIZE": "true",
-		"SPARK_HISTORY_OPTS": strings.Join(jvmOpts, " "),
+	envVars := []corev1.EnvVar{
+		{
+			Name:  "SPARK_NO_DAEMONIZE",
+			Value: "true",
+		},
+		{
+			Name:  "SPARK_HISTORY_OPTS",
+			Value: strings.Join(jvmOpts, " "),
+		},
 	}
 
 	return envVars
@@ -118,7 +124,7 @@ func (b *DeploymentBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.
 	containerBuilder.SetCommand([]string{"/bin/bash", "-c"})
 	containerBuilder.SetArgs([]string{b.getMainContainerCmdArgs(s3LogConfig)})
 	containerBuilder.AddPorts(b.Ports)
-	containerBuilder.AddEnvs(b.getMainContainerEnvVars())
+	containerBuilder.AddEnvVars(b.getMainContainerEnvVars())
 	containerBuilder.SetSecurityContext(0, 0, false)
 	return containerBuilder
 }
