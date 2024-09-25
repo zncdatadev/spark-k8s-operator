@@ -1,0 +1,16 @@
+apiVersion: spark.zncdata.dev/v1alpha1
+kind: SparkHistoryServer
+metadata:
+  name: sparkhistory
+spec:
+  clusterConfig:
+    listenerClass: cluster-internal
+    logFileDirectory:
+      s3:
+        prefix: events
+        bucket:
+          reference: spark-history
+  node:
+    roleGroups:
+      default:
+        replicas: 1

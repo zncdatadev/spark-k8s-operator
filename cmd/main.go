@@ -28,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	authv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/authentication/v1alpha1"
+	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -36,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
-	"github.com/zncdatadev/spark-k8s-operator/internal/controller"
+	"github.com/zncdatadev/spark-k8s-operator/internal/controller/historyserver"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -50,6 +52,9 @@ func init() {
 
 	utilruntime.Must(sparkv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	utilruntime.Must(authv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(s3v1alpha1.AddToScheme(scheme))
 }
 
 // getWatchNamespaces returns the Namespaces the operator should be watching for changes
@@ -137,7 +142,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.SparkHistoryServerReconciler{
+	if err = (&historyserver.SparkHistoryServerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

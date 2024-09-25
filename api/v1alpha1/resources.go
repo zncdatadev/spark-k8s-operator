@@ -12,7 +12,7 @@ type ResourcesSpec struct {
 	Memory *MemoryResource `json:"memory,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Storage *StorageResource `json:"storage,omitempty"`
+	Storage *StorageResourceSpec `json:"storage,omitempty"`
 }
 
 type StorageResourceSpec struct {

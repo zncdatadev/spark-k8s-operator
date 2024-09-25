@@ -1,0 +1,107 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: oidc
+spec:
+  bindings:
+  - name: MINIO_USER
+    value: miniouser
+  - name: MINIO_PASSWORD
+    value: miniouserpassword
+  - name: MINIO_BUCKET
+    value: spark-history
+  - name: KEYCLOAK_REALM
+    value: kubedoop
+  - name: KEYCLOAK_CLIENT_ID
+    value: auth2-proxy
+  - name: KEYCLOAK_CLIENT_SECRET
+    value: auth2-proxy
+  - name: KEYCLOAK_USER
+    value: user
+  - name: KEYCLOAK_PASSWORD
+    value: password
+  steps:
+  - try:
+    - apply:
+        file: ../setup/olm.yaml
+    - assert:
+        file: ../setup/olm-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/subs.yaml
+    - assert:
+        file: ../setup/subs-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/listener-csi.yaml
+    - assert:
+        file: ../setup/listenercsi-assert.yaml
+    - apply:
+        file: ../setup/secret-csi.yaml
+    - assert:
+        file: ../setup/secretcsi-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/minio.yaml
+    - assert:
+        file: ../setup/minio-assert.yaml
+  - try:
+    - apply:
+        file: ../setup/spark-s3-credentials.yaml
+    - assert:
+        file: ../setup/spark-s3-credentials-assert.yaml
+    - apply:
+        file: ../setup/s3bucket.yaml
+    - assert:
+        file: ../setup/s3bucket.yaml
+  - try:
+    - apply:
+        file: keycloak.yaml
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+          - name: KEYCLOAK_REALM
+            value: ($KEYCLOAK_REALM)
+          - name: KEYCLOAK_USER
+            value: ($KEYCLOAK_USER)
+          - name: KEYCLOAK_PASSWORD
+            value: ($KEYCLOAK_PASSWORD)
+          - name: KEYCLOAK_CLIENT_ID
+            value: ($KEYCLOAK_CLIENT_ID)
+          - name: KEYCLOAK_CLIENT_SECRET
+            value: ($KEYCLOAK_CLIENT_SECRET)
+        content: |
+          cat keycloak-config.yaml | envsubst | kubectl apply -n $NAMESPACE -f -
+    - assert:
+        file: keycloak-assert.yaml
+  - try:
+    - apply:
+        file: oidc-credentials.yaml
+    - apply:
+        file: authenticationclass.yaml
+  - try:
+    - apply:
+        file: sparkhistoryserver.yaml
+    - assert:
+        file: sparkhistoryserver-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 60s
+    catch:
+      - sleep:
+          duration: 5s
+      - script:
+          env:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            set -ex
+            kubectl -n $NAMESPACE get pods
+      - describe:
+          apiVersion: v1
+          kind: Pod
+          selector: app.kubernetes.io/instance=sparkhistory
+      - podLogs:
+          selector: app.kubernetes.io/instance=sparkhistory
+          tail: -1
