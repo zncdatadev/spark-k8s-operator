@@ -35,7 +35,7 @@ type S3BucketConnect struct {
 	credential *commonsv1alpha1.Credentials
 }
 
-func GetS3BucketConnect(ctx context.Context, client *client.Client, s3 *shsv1alpha1.S3BucketSpec) (*S3BucketConnect, error) {
+func GetS3BucketConnect(ctx context.Context, client *client.Client, s3 *shsv1alpha1.BucketSpec) (*S3BucketConnect, error) {
 	if s3.Inline != nil {
 		return GetInlineS3Bucket(ctx, client, s3.Inline)
 	}

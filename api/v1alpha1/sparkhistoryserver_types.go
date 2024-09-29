@@ -121,13 +121,13 @@ type LogFileDirectorySpec struct {
 
 type S3Spec struct {
 	// +kubebuilder:validation:Required
-	Bucket *S3BucketSpec `json:"bucket"`
+	Bucket *BucketSpec `json:"bucket"`
 
 	// +kubebuilder:validation:Required
 	Prefix string `json:"prefix"`
 }
 
-type S3BucketSpec struct {
+type BucketSpec struct {
 	// +kubebuilder:validation:Optional
 	Inline *s3v1alpha1.S3BucketSpec `json:"inline,omitempty"`
 
