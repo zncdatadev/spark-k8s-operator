@@ -47,8 +47,8 @@ spec:
       - displayName: Image
         path: image
       - description: spark history server role spec
-        displayName: Spark History
-        path: sparkHistory
+        displayName: Node
+        path: node
       version: v1alpha1
   description: spark for k8s operator
   displayName: Spark K8s Operator
