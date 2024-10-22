@@ -9,6 +9,7 @@ import (
 
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	"github.com/zncdatadev/operator-go/pkg/client"
+	"github.com/zncdatadev/operator-go/pkg/productlogging"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -21,8 +22,11 @@ type ConfigMapBuilder struct {
 	builder.ConfigMapBuilder
 
 	ClusteerConfig *shsv1alpha1.ClusterConfigSpec
-	RoleName       string
 	ProductLogging *shsv1alpha1.LoggingSpec
+
+	ClusterName   string
+	RoleName      string
+	RoleGroupName string
 }
 
 func NewSparkConfigMapBuilder(
@@ -35,8 +39,11 @@ func NewSparkConfigMapBuilder(
 	return &ConfigMapBuilder{
 		ConfigMapBuilder: *builder.NewConfigMapBuilder(client, name, options.Labels, options.Annotations),
 		ClusteerConfig:   clusterConfig,
-		RoleName:         options.RoleName,
 		ProductLogging:   productLogging,
+
+		ClusterName:   options.ClusterName,
+		RoleName:      options.RoleName,
+		RoleGroupName: options.RoleGroupName,
 	}
 }
 
@@ -62,19 +69,35 @@ func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error)
 		return nil, err
 	}
 
-	data := map[string]string{
-		SparkConfigDefauleFileName: b.getSparkDefaules(S3Logconfig),
+	b.AddItem(SparkConfigDefauleFileName, b.getSparkDefaules(S3Logconfig))
+	b.AddItem("log4j2.properties", b.getLog4j())
+
+	if vectorConfig, err := b.getVectorConfig(ctx); err != nil {
+		return nil, err
+	} else if vectorConfig != "" {
+		b.AddItem(builder.VectorConfigFile, vectorConfig)
 	}
 
-	b.AddData(data)
-
-	ProductLogging(
-		b.ProductLogging,
-		SparkHistoryContainerName,
-		b,
-	)
-
 	return b.GetObject(), nil
+}
+
+func (b *ConfigMapBuilder) getVectorConfig(ctx context.Context) (string, error) {
+	if b.ClusteerConfig != nil && b.ClusteerConfig.VectorAggregatorConfigMapName != "" {
+		s, err := productlogging.MakeVectorYaml(
+			ctx,
+			b.Client.Client,
+			b.Client.GetOwnerNamespace(),
+			b.ClusterName,
+			b.RoleName,
+			b.RoleGroupName,
+			b.ClusteerConfig.VectorAggregatorConfigMapName,
+		)
+		if err != nil {
+			return "", err
+		}
+		return s, nil
+	}
+	return "", nil
 }
 
 func (b *ConfigMapBuilder) isCleaner() (bool, error) {
@@ -114,6 +137,28 @@ func (b *ConfigMapBuilder) isCleaner() (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (b *ConfigMapBuilder) getLog4j() string {
+	if b.ProductLogging == nil {
+		return ""
+	}
+
+	loggingConfig, ok := b.ProductLogging.Containers[SparkHistoryContainerName]
+	if !ok {
+		return ""
+	}
+
+	log4j2Config := productlogging.NewLog4j2ConfigGenerator(
+		&loggingConfig,
+		SparkHistoryContainerName,
+		"%d{ISO8601} %p [%t] %c - %m%n",
+		nil,
+		"spark.log4j2.xml",
+		"",
+	)
+
+	return log4j2Config.Generate()
 }
 
 func (b *ConfigMapBuilder) getSparkDefaules(s3Logconfig *S3Logconfig) string {

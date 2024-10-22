@@ -181,6 +181,8 @@ spec:
                     required:
                     - s3
                     type: object
+                  vectorAggregatorConfigMapName:
+                    type: string
                 type: object
               clusterOperation:
                 description: ClusterOperationSpec defines the desired state of ClusterOperation

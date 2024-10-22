@@ -91,6 +91,9 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
 	ListenerClass string `json:"listenerClass,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	VectorAggregatorConfigMapName string `json:"vectorAggregatorConfigMapName,omitempty"`
 }
 
 type AuthenticationSpec struct {
