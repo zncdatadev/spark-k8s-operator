@@ -27,6 +27,10 @@ import (
 const (
 	SparkConfigDefauleFileName = "spark-defaults.conf"
 	SparkHistoryContainerName  = "spark-history"
+
+	LogVolumeName = "log"
+
+	ConfigVolumeName = "config"
 )
 
 var _ builder.DeploymentBuilder = &DeploymentBuilder{}
@@ -130,10 +134,8 @@ func (b *DeploymentBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.
 }
 
 func (b *DeploymentBuilder) addSparkDefaultConfigVolume(containerBuilder *builder.Container) {
-	volumeName := "spark-default-config"
-
 	volume := &corev1.Volume{
-		Name: volumeName,
+		Name: ConfigVolumeName,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
@@ -146,7 +148,7 @@ func (b *DeploymentBuilder) addSparkDefaultConfigVolume(containerBuilder *builde
 	b.AddVolume(volume)
 
 	volumeMount := &corev1.VolumeMount{
-		Name:      volumeName,
+		Name:      ConfigVolumeName,
 		MountPath: constants.KubedoopConfigDirMount,
 	}
 
@@ -313,7 +315,22 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 		b.AddContainer(oidcContainer)
 	}
 
-	return b.GetObject()
+	obj, err := b.GetObject()
+	if err != nil {
+		return nil, err
+	}
+
+	if b.ClusteerConfig != nil && b.ClusteerConfig.VectorAggregatorConfigMapName != "" {
+		builder.NewVectorDecorator(
+			obj,
+			b.GetImage(),
+			LogVolumeName,
+			ConfigVolumeName,
+			b.ClusteerConfig.VectorAggregatorConfigMapName,
+		)
+	}
+
+	return obj, nil
 }
 
 func NewDeploymentReconciler(
