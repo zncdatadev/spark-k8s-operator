@@ -23,25 +23,6 @@ spec:
   steps:
   - try:
     - apply:
-        file: ../setup/olm.yaml
-    - assert:
-        file: ../setup/olm-assert.yaml
-  - try:
-    - apply:
-        file: ../setup/subs.yaml
-    - assert:
-        file: ../setup/subs-assert.yaml
-  - try:
-    - apply:
-        file: ../setup/listener-csi.yaml
-    - assert:
-        file: ../setup/listenercsi-assert.yaml
-    - apply:
-        file: ../setup/secret-csi.yaml
-    - assert:
-        file: ../setup/secretcsi-assert.yaml
-  - try:
-    - apply:
         file: ../setup/minio.yaml
     - assert:
         file: ../setup/minio-assert.yaml
