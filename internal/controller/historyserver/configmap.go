@@ -11,6 +11,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/client"
 	"github.com/zncdatadev/operator-go/pkg/productlogging"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
+	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
@@ -34,16 +35,22 @@ func NewSparkConfigMapBuilder(
 	name string,
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
 	productLogging *shsv1alpha1.LoggingSpec,
-	options builder.Options,
+	options ...builder.Options,
 ) *ConfigMapBuilder {
+
+	opt := builder.Option{}
+	for _, o := range options {
+		opt = o(opt)
+	}
+
 	return &ConfigMapBuilder{
-		ConfigMapBuilder: *builder.NewConfigMapBuilder(client, name, options.Labels, options.Annotations),
+		ConfigMapBuilder: *builder.NewConfigMapBuilder(client, name, opt.Labels, opt.Annotations),
 		ClusteerConfig:   clusterConfig,
 		ProductLogging:   productLogging,
 
-		ClusterName:   options.ClusterName,
-		RoleName:      options.RoleName,
-		RoleGroupName: options.RoleGroupName,
+		ClusterName:   opt.ClusterName,
+		RoleName:      opt.RoleName,
+		RoleGroupName: opt.RoleGroupName,
 	}
 }
 
@@ -70,7 +77,11 @@ func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error)
 	}
 
 	b.AddItem(SparkConfigDefauleFileName, b.getSparkDefaules(S3Logconfig))
-	b.AddItem("log4j2.properties", b.getLog4j())
+	logProperties, err := b.getLog4j()
+	if err != nil {
+		return nil, err
+	}
+	b.AddItem("log4j2.properties", logProperties)
 
 	if vectorConfig, err := b.getVectorConfig(ctx); err != nil {
 		return nil, err
@@ -139,26 +150,31 @@ func (b *ConfigMapBuilder) isCleaner() (bool, error) {
 	return false, nil
 }
 
-func (b *ConfigMapBuilder) getLog4j() string {
+func (b *ConfigMapBuilder) getLog4j() (string, error) {
 	if b.ProductLogging == nil {
-		return ""
+		return "", nil
 	}
 
 	loggingConfig, ok := b.ProductLogging.Containers[SparkHistoryContainerName]
 	if !ok {
-		return ""
+		return "", nil
 	}
 
-	log4j2Config := productlogging.NewLog4j2ConfigGenerator(
+	logGenerator, err := productlogging.NewConfigGenerator(
 		&loggingConfig,
 		SparkHistoryContainerName,
-		"%d{ISO8601} %p [%t] %c - %m%n",
-		nil,
 		"spark.log4j2.xml",
-		"",
+		productlogging.LogTypeLog4j2,
+		func(cgo *productlogging.ConfigGeneratorOption) {
+			cgo.ConsoleHandlerFormatter = ptr.To("%d{ISO8601} %p [%t] %c - %m%n")
+		},
 	)
 
-	return log4j2Config.Generate()
+	if err != nil {
+		return "", err
+	}
+
+	return logGenerator.Content()
 }
 
 func (b *ConfigMapBuilder) getSparkDefaules(s3Logconfig *S3Logconfig) string {
@@ -211,10 +227,11 @@ func NewConfigMapReconciler(
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
 		loggingSpec,
-		builder.Options{
-			RoleName:    roleGroupInfo.RoleName,
-			Labels:      roleGroupInfo.GetLabels(),
-			Annotations: roleGroupInfo.GetAnnotations(),
+		func(o builder.Option) builder.Option {
+			o.RoleName = roleGroupInfo.RoleName
+			o.Labels = roleGroupInfo.GetLabels()
+			o.Annotations = roleGroupInfo.GetAnnotations()
+			return o
 		},
 	)
 

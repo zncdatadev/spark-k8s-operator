@@ -195,10 +195,9 @@ func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Conta
 		issuer.Host += ":" + strconv.Itoa(oidcProvider.Port)
 	}
 
-	provisioner := oidcProvider.Provisioner
-	// TODO: fix support keycloak-oidc
-	if provisioner == "keycloak" {
-		provisioner = "keycloak-oidc"
+	providerHint := oidcProvider.ProviderHint
+	if providerHint == "keycloak" {
+		providerHint = "keycloak-oidc"
 	}
 
 	clientCredentialsSecretName := b.ClusteerConfig.Authentication.Oidc.ClientCredentialsSecret
@@ -260,7 +259,7 @@ func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Conta
 			},
 			{
 				Name:  "OAUTH2_PROXY_PROVIDER",
-				Value: provisioner,
+				Value: providerHint,
 			},
 			{
 				Name:  "OAUTH2_PROXY_UPSTREAMS",
@@ -343,7 +342,7 @@ func NewDeploymentReconciler(
 	spec *shsv1alpha1.RoleGroupSpec,
 ) (*reconciler.Deployment, error) {
 	options := builder.WorkloadOptions{
-		Options: builder.Options{
+		Option: builder.Option{
 			ClusterName:   roleGroupInfo.ClusterName,
 			RoleName:      roleGroupInfo.RoleName,
 			RoleGroupName: roleGroupInfo.RoleGroupName,
@@ -351,8 +350,8 @@ func NewDeploymentReconciler(
 			Annotations:   roleGroupInfo.GetAnnotations(),
 		},
 		// PodOverrides:     spec.PodOverrides,
-		EnvOverrides:     spec.EnvOverrides,
-		CommandOverrides: spec.CliOverrides,
+		EnvOverrides: spec.EnvOverrides,
+		CliOverrides: spec.CliOverrides,
 	}
 
 	if spec.Config != nil {
