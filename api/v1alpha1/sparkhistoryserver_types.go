@@ -170,6 +170,9 @@ type RoleSpec struct {
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	RoleConfig *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	CliOverrides []string `json:"cliOverrides,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -191,9 +194,6 @@ type ConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Affinity *corev1.Affinity `json:"affinity"`
 
-	// +kubebuilder:validation:Optional
-	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
-
 	// Use time.ParseDuration to parse the string
 	// +kubebuilder:validation:Optional
 	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
@@ -206,14 +206,6 @@ type ConfigSpec struct {
 
 	// +kubebuilder:validation:Optional
 	Cleaner *bool `json:"cleaner,omitempty"`
-}
-
-type PodDisruptionBudgetSpec struct {
-	// +kubebuilder:validation:Optional
-	MinAvailable int32 `json:"minAvailable,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	MaxUnavailable int32 `json:"maxUnavailable,omitempty"`
 }
 
 type RoleGroupSpec struct {
