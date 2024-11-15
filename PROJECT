@@ -5,10 +5,6 @@
 domain: zncdata.dev
 layout:
 - go.kubebuilder.io/v4
-plugins:
-  grafana.kubebuilder.io/v1-alpha: {}
-  manifests.sdk.operatorframework.io/v2: {}
-  scorecard.sdk.operatorframework.io/v2: {}
 projectName: spark-k8s-operator
 repo: github.com/zncdatadev/spark-k8s-operator
 resources:
