@@ -60,7 +60,7 @@ func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if ctrlclient.IgnoreNotFound(err) == nil {
-			logger.V(1).Info("SupersetCluster resource not found. Ignoring since object must be deleted.")
+			logger.V(1).Info("SparkHistoryServer resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err

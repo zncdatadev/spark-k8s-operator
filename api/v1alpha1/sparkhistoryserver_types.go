@@ -60,8 +60,8 @@ type SparkHistoryServerSpec struct {
 	Image *ImageSpec `json:"image,omitempty"`
 
 	// spark history server cluster config
-	// +kubebuilder:validation:Optional
-	ClusterConfig *ClusterConfigSpec `json:"clusterConfig,omitempty"`
+	// +kubebuilder:validation:Required
+	ClusterConfig *ClusterConfigSpec `json:"clusterConfig"`
 
 	// +kubebuilder:validation:Optional
 	ClusterOperation *commonsv1alpha1.ClusterOperationSpec `json:"clusterOperation,omitempty"`
@@ -75,8 +75,8 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	Authentication *AuthenticationSpec `json:"authentication,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	LogFileDirectory *LogFileDirectorySpec `json:"logFileDirectory,omitempty"`
+	// +kubebuilder:validation:Required
+	LogFileDirectory *LogFileDirectorySpec `json:"logFileDirectory"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=cluster-internal
@@ -154,6 +154,7 @@ type ImageSpec struct {
 }
 
 type RoleSpec struct {
+	*commonsv1alpha1.OverridesSpec `json:",inline"`
 
 	// +kubebuilder:validation:Optional
 	Config *ConfigSpec `json:"config,omitempty"`
@@ -162,18 +163,6 @@ type RoleSpec struct {
 
 	// +kubebuilder:validation:Optional
 	RoleConfig *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	CliOverrides []string `json:"cliOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	PodOverrides *PodOverridesSpec `json:"podOverrides,omitempty"`
 }
 
 type ConfigOverridesSpec struct {
@@ -181,41 +170,21 @@ type ConfigOverridesSpec struct {
 }
 
 type ConfigSpec struct {
-	// +kubebuilder:validation:Optional
-	Affinity *corev1.Affinity `json:"affinity"`
-
-	// Use time.ParseDuration to parse the string
-	// +kubebuilder:validation:Optional
-	GracefulShutdownTimeout *string `json:"gracefulShutdownTimeout,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Logging *LoggingSpec `json:"logging,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	Resources *commonsv1alpha1.ResourcesSpec `json:"resources,omitempty"`
+	*commonsv1alpha1.RoleGroupConfigSpec `json:",inline"`
 
 	// +kubebuilder:validation:Optional
 	Cleaner *bool `json:"cleaner,omitempty"`
 }
 
 type RoleGroupSpec struct {
+	*commonsv1alpha1.OverridesSpec `json:",inline"`
+
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=1
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
+	// +kubebuilder:validation:Optional
 	Config *ConfigSpec `json:"config,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	CliOverrides []string `json:"cliOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	ConfigOverrides *ConfigOverridesSpec `json:"configOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	EnvOverrides map[string]string `json:"envOverrides,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	PodOverrides *PodOverridesSpec `json:"podOverrides,omitempty"`
 }
 
 type PodOverridesSpec struct {
