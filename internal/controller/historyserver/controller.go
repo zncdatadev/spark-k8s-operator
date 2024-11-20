@@ -39,17 +39,17 @@ type SparkHistoryServerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=spark.zncdata.dev,resources=sparkhistoryservers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=spark.kubedoop.dev,resources=sparkhistoryservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=spark.kubedoop.dev,resources=sparkhistoryservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=spark.kubedoop.dev,resources=sparkhistoryservers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-// +kubebuilder:rbac:groups=authentication.zncdata.dev,resources=authenticationclasses,verbs=get;list;watch
-// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3connections,verbs=get;list;watch
-// +kubebuilder:rbac:groups=s3.zncdata.dev,resources=s3buckets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=authentication.kubedoop.dev,resources=authenticationclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.kubedoop.dev,resources=s3connections,verbs=get;list;watch
+// +kubebuilder:rbac:groups=s3.kubedoop.dev,resources=s3buckets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SparkHistoryServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

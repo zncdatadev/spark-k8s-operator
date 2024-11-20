@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.2
-  name: sparkhistoryservers.spark.zncdata.dev
+  name: sparkhistoryservers.spark.kubedoop.dev
 spec:
-  group: spark.zncdata.dev
+  group: spark.kubedoop.dev
   names:
     kind: SparkHistoryServer
     listKind: SparkHistoryServerList
