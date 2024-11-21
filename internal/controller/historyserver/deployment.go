@@ -9,9 +9,9 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	authv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/authentication/v1alpha1"
+	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	resourceClient "github.com/zncdatadev/operator-go/pkg/client"
 	"github.com/zncdatadev/operator-go/pkg/constants"
@@ -50,7 +50,9 @@ func NewDeploymentBuilder(
 	replicas *int32,
 	ports []corev1.ContainerPort,
 	image *util.Image,
-	options builder.WorkloadOptions,
+	overrides *commonsv1alpha1.OverridesSpec,
+	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
+	options ...builder.Option,
 ) *DeploymentBuilder {
 	return &DeploymentBuilder{
 		Deployment: *builder.NewDeployment(
@@ -58,12 +60,12 @@ func NewDeploymentBuilder(
 			name,
 			replicas,
 			image,
-			options,
+			overrides,
+			roleGroupConfig,
+			options...,
 		),
 		Ports:          ports,
 		ClusteerConfig: clusterConfig,
-		ClusterName:    options.ClusterName,
-		RoleName:       options.RoleName,
 	}
 }
 
@@ -338,49 +340,27 @@ func NewDeploymentReconciler(
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
 	ports []corev1.ContainerPort,
 	image *util.Image,
+	replicas *int32,
 	stopped bool,
-	spec *shsv1alpha1.RoleGroupSpec,
+	overrides *commonsv1alpha1.OverridesSpec,
+	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
+	options ...builder.Option,
 ) (*reconciler.Deployment, error) {
-	options := builder.WorkloadOptions{
-		Option: builder.Option{
-			ClusterName:   roleGroupInfo.ClusterName,
-			RoleName:      roleGroupInfo.RoleName,
-			RoleGroupName: roleGroupInfo.RoleGroupName,
-			Labels:        roleGroupInfo.GetLabels(),
-			Annotations:   roleGroupInfo.GetAnnotations(),
-		},
-		// PodOverrides:     spec.PodOverrides,
-		EnvOverrides: spec.EnvOverrides,
-		CliOverrides: spec.CliOverrides,
-	}
-
-	if spec.Config != nil {
-		if spec.Config.GracefulShutdownTimeout != nil {
-			if gracefulShutdownTimeout, err := time.ParseDuration(*spec.Config.GracefulShutdownTimeout); err != nil {
-				return nil, err
-			} else {
-				options.TerminationGracePeriod = &gracefulShutdownTimeout
-			}
-
-		}
-
-		options.Affinity = spec.Config.Affinity
-		options.Resource = spec.Config.Resources
-	}
 
 	b := NewDeploymentBuilder(
 		client,
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
-		&spec.Replicas,
+		replicas,
 		ports,
 		image,
-		options,
+		overrides,
+		roleGroupConfig,
+		options...,
 	)
 
 	return reconciler.NewDeployment(
 		client,
-		roleGroupInfo.GetFullName(),
 		b,
 		stopped,
 	), nil

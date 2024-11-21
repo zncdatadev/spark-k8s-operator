@@ -1,4 +1,4 @@
-apiVersion: spark.zncdata.dev/v1alpha1
+apiVersion: spark.kubedoop.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
   labels:
@@ -12,8 +12,16 @@ spec:
   clusterOperation:
     stopped: false
   clusterConfig:
-    listenerClass: external-unstable
-  sparkHistory:
+    logFileDirectory:
+      s3:
+        bucket:
+          inline:
+            bucketName: spark-k8s
+            connection:
+              inline:
+                credentials:
+                  secretClass: spark-s3
+  node:
     config:
       resources:
         cpu:
@@ -27,9 +35,10 @@ spec:
         config:
           gracefulShutdownTimeout: 10s
           logging:
-            sparkHistory:
-              console:
-                level: "INFO"
+            containers:
+              node:
+                console:
+                  level: "INFO"
           resources:
             cpu:
               min: 300m

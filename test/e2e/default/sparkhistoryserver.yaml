@@ -1,4 +1,4 @@
-apiVersion: spark.zncdata.dev/v1alpha1
+apiVersion: spark.kubedoop.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
   name: sparkhistory

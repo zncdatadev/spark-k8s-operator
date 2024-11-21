@@ -68,7 +68,7 @@ spec:
         file: sparkhistoryserver-assert.yaml
     cleanup:
     - sleep:
-        duration: 60s
+        duration: 5s
     catch:
       - sleep:
           duration: 5s

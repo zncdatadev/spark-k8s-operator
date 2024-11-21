@@ -14,7 +14,7 @@ import (
 	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	sparkv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
 )
 
 var _ builder.ConfigBuilder = &ConfigMapBuilder{}
@@ -22,8 +22,8 @@ var _ builder.ConfigBuilder = &ConfigMapBuilder{}
 type ConfigMapBuilder struct {
 	builder.ConfigMapBuilder
 
-	ClusteerConfig *shsv1alpha1.ClusterConfigSpec
-	ProductLogging *shsv1alpha1.LoggingSpec
+	ClusteerConfig  *sparkv1alpha1.ClusterConfigSpec
+	RoleGroupConfig *sparkv1alpha1.ConfigSpec
 
 	ClusterName   string
 	RoleName      string
@@ -33,24 +33,14 @@ type ConfigMapBuilder struct {
 func NewSparkConfigMapBuilder(
 	client *client.Client,
 	name string,
-	clusterConfig *shsv1alpha1.ClusterConfigSpec,
-	productLogging *shsv1alpha1.LoggingSpec,
-	options ...builder.Options,
+	clusterConfig *sparkv1alpha1.ClusterConfigSpec,
+	roleGroupConfig *sparkv1alpha1.ConfigSpec,
+	options ...builder.Option,
 ) *ConfigMapBuilder {
-
-	opt := builder.Option{}
-	for _, o := range options {
-		opt = o(opt)
-	}
-
 	return &ConfigMapBuilder{
-		ConfigMapBuilder: *builder.NewConfigMapBuilder(client, name, opt.Labels, opt.Annotations),
+		ConfigMapBuilder: *builder.NewConfigMapBuilder(client, name, options...),
 		ClusteerConfig:   clusterConfig,
-		ProductLogging:   productLogging,
-
-		ClusterName:   opt.ClusterName,
-		RoleName:      opt.RoleName,
-		RoleGroupName: opt.RoleGroupName,
+		RoleGroupConfig:  roleGroupConfig,
 	}
 }
 
@@ -114,7 +104,7 @@ func (b *ConfigMapBuilder) getVectorConfig(ctx context.Context) (string, error) 
 func (b *ConfigMapBuilder) isCleaner() (bool, error) {
 	cleaners := map[string]bool{}
 
-	owner, ok := b.GetClient().GetOwnerReference().(*shsv1alpha1.SparkHistoryServer)
+	owner, ok := b.GetClient().GetOwnerReference().(*sparkv1alpha1.SparkHistoryServer)
 	if !ok {
 		return false, fmt.Errorf("owner is not a SparkHistoryServer")
 	}
@@ -129,8 +119,8 @@ func (b *ConfigMapBuilder) isCleaner() (bool, error) {
 	}
 
 	for roleGroupName, roleGroup := range role.RoleGroups {
-		if roleGroup.Config != nil && roleGroup.Config.Cleaner != nil {
-			if *roleGroup.Config.Cleaner && roleGroup.Replicas > 1 {
+		if roleGroup.Config != nil && roleGroup.Config.Cleaner != nil && roleGroup.Replicas != nil {
+			if *roleGroup.Config.Cleaner && *roleGroup.Replicas > 1 {
 				return false, fmt.Errorf(
 					"role group has cleaner enabled but has more than one replica. "+
 						"Namespace: %s, ClusterName: %s, RoleName: %s, RoleGroupName: %s",
@@ -151,30 +141,32 @@ func (b *ConfigMapBuilder) isCleaner() (bool, error) {
 }
 
 func (b *ConfigMapBuilder) getLog4j() (string, error) {
-	if b.ProductLogging == nil {
-		return "", nil
+	if b.RoleGroupConfig != nil && b.RoleGroupConfig.RoleGroupConfigSpec != nil && b.RoleGroupConfig.Logging != nil && len(b.RoleGroupConfig.Logging.Containers) > 0 {
+
+		loggingConfig, ok := b.RoleGroupConfig.Logging.Containers[SparkHistoryContainerName]
+		if !ok {
+			return "", nil
+		}
+
+		logGenerator, err := productlogging.NewConfigGenerator(
+			&loggingConfig,
+			SparkHistoryContainerName,
+			"spark.log4j2.xml",
+			productlogging.LogTypeLog4j2,
+			func(cgo *productlogging.ConfigGeneratorOption) {
+				cgo.ConsoleHandlerFormatter = ptr.To("%d{ISO8601} %p [%t] %c - %m%n")
+			},
+		)
+
+		if err != nil {
+			return "", err
+		}
+
+		return logGenerator.Content()
 	}
 
-	loggingConfig, ok := b.ProductLogging.Containers[SparkHistoryContainerName]
-	if !ok {
-		return "", nil
-	}
+	return "", nil
 
-	logGenerator, err := productlogging.NewConfigGenerator(
-		&loggingConfig,
-		SparkHistoryContainerName,
-		"spark.log4j2.xml",
-		productlogging.LogTypeLog4j2,
-		func(cgo *productlogging.ConfigGeneratorOption) {
-			cgo.ConsoleHandlerFormatter = ptr.To("%d{ISO8601} %p [%t] %c - %m%n")
-		},
-	)
-
-	if err != nil {
-		return "", err
-	}
-
-	return logGenerator.Content()
 }
 
 func (b *ConfigMapBuilder) getSparkDefaules(s3Logconfig *S3Logconfig) string {
@@ -212,29 +204,20 @@ func (b *ConfigMapBuilder) getSparkDefaules(s3Logconfig *S3Logconfig) string {
 
 func NewConfigMapReconciler(
 	client *client.Client,
-	clusterConfig *shsv1alpha1.ClusterConfigSpec,
+	clusterConfig *sparkv1alpha1.ClusterConfigSpec,
 	roleGroupInfo reconciler.RoleGroupInfo,
-	spec *shsv1alpha1.RoleGroupSpec,
+	roleGroupConfig *sparkv1alpha1.ConfigSpec,
+	options ...builder.Option,
 ) *reconciler.SimpleResourceReconciler[*ConfigMapBuilder] {
-
-	var loggingSpec *shsv1alpha1.LoggingSpec
-	if spec.Config != nil {
-		loggingSpec = spec.Config.Logging
-	}
 
 	builder := NewSparkConfigMapBuilder(
 		client,
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
-		loggingSpec,
-		func(o builder.Option) builder.Option {
-			o.RoleName = roleGroupInfo.RoleName
-			o.Labels = roleGroupInfo.GetLabels()
-			o.Annotations = roleGroupInfo.GetAnnotations()
-			return o
-		},
+		roleGroupConfig,
+		options...,
 	)
 
-	return reconciler.NewSimpleResourceReconciler[*ConfigMapBuilder](client, roleGroupInfo.GetFullName(), builder)
+	return reconciler.NewSimpleResourceReconciler[*ConfigMapBuilder](client, builder)
 
 }
