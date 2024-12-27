@@ -53,6 +53,8 @@ spec:
         file: sparkhistoryserver-assert.yaml
   - name: assert sparkhistoryserver logs
     try:
+    - sleep:
+        duration: 50s
     - script:
         env:
           - name: NAMESPACE
