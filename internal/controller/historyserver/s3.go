@@ -114,7 +114,7 @@ func NewS3Logconfig(
 }
 
 func (s *S3Logconfig) GetMountPath() string {
-	return path.Join(constants.KubedoopSecretDir, "s3-credentials")
+	return path.Join(constants.KubedoopSecretDir, S3VolumeName)
 }
 
 func (s *S3Logconfig) GetVolumeName() string {

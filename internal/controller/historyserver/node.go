@@ -6,6 +6,7 @@ import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	resourceClient "github.com/zncdatadev/operator-go/pkg/client"
+	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -136,6 +137,14 @@ func (r *NodeRoleReconciler) GetImageResourceWithRoleGroup(
 		r.Client,
 		info.GetFullName(),
 		append(SparkHistoryPorts, OidcPorts...),
+		func(o *builder.ServiceBuilderOptions) {
+			o.ListenerClass = constants.ListenerClass(r.ClusterConfig.ListenerClass)
+			o.ClusterName = info.GetClusterName()
+			o.RoleName = info.GetRoleName()
+			o.RoleGroupName = info.GetGroupName()
+			o.Labels = info.GetLabels()
+			o.Annotations = info.GetAnnotations()
+		},
 	)
 	return []reconciler.Reconciler{cm, deployment, svc}, nil
 }

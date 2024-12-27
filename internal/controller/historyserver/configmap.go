@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	loggingv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	"github.com/zncdatadev/operator-go/pkg/client"
 	"github.com/zncdatadev/operator-go/pkg/productlogging"
@@ -24,10 +25,6 @@ type ConfigMapBuilder struct {
 
 	ClusteerConfig  *sparkv1alpha1.ClusterConfigSpec
 	RoleGroupConfig *sparkv1alpha1.ConfigSpec
-
-	ClusterName   string
-	RoleName      string
-	RoleGroupName string
 }
 
 func NewSparkConfigMapBuilder(
@@ -76,7 +73,7 @@ func (b *ConfigMapBuilder) Build(ctx context.Context) (ctrlclient.Object, error)
 	if vectorConfig, err := b.getVectorConfig(ctx); err != nil {
 		return nil, err
 	} else if vectorConfig != "" {
-		b.AddItem(builder.VectorConfigFile, vectorConfig)
+		b.AddItem(builder.VectorConfigFileName, vectorConfig)
 	}
 
 	return b.GetObject(), nil
@@ -141,32 +138,30 @@ func (b *ConfigMapBuilder) isCleaner() (bool, error) {
 }
 
 func (b *ConfigMapBuilder) getLog4j() (string, error) {
+	var loggingConfig loggingv1alpha1.LoggingConfigSpec
 	if b.RoleGroupConfig != nil && b.RoleGroupConfig.RoleGroupConfigSpec != nil && b.RoleGroupConfig.Logging != nil && len(b.RoleGroupConfig.Logging.Containers) > 0 {
-
-		loggingConfig, ok := b.RoleGroupConfig.Logging.Containers[SparkHistoryContainerName]
+		var ok bool
+		loggingConfig, ok = b.RoleGroupConfig.Logging.Containers[SparkHistoryContainerName]
 		if !ok {
 			return "", nil
 		}
-
-		logGenerator, err := productlogging.NewConfigGenerator(
-			&loggingConfig,
-			SparkHistoryContainerName,
-			"spark.log4j2.xml",
-			productlogging.LogTypeLog4j2,
-			func(cgo *productlogging.ConfigGeneratorOption) {
-				cgo.ConsoleHandlerFormatter = ptr.To("%d{ISO8601} %p [%t] %c - %m%n")
-			},
-		)
-
-		if err != nil {
-			return "", err
-		}
-
-		return logGenerator.Content()
 	}
 
-	return "", nil
+	logGenerator, err := productlogging.NewConfigGenerator(
+		&loggingConfig,
+		SparkHistoryContainerName,
+		"spark.log4j2.xml",
+		productlogging.LogTypeLog4j2,
+		func(cgo *productlogging.ConfigGeneratorOption) {
+			cgo.ConsoleHandlerFormatter = ptr.To("%d{ISO8601} %p [%t] %c - %m%n")
+		},
+	)
 
+	if err != nil {
+		return "", err
+	}
+
+	return logGenerator.Content()
 }
 
 func (b *ConfigMapBuilder) getSparkDefaules(s3Logconfig *S3Logconfig) string {
