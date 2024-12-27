@@ -1,0 +1,41 @@
+apiVersion: s3.kubedoop.dev/v1alpha1
+kind: S3Bucket
+metadata:
+  name: spark-history
+spec:
+  bucketName: spark-history
+  connection:
+    reference: minio
+---
+apiVersion: s3.kubedoop.dev/v1alpha1
+kind: S3Connection
+metadata:
+  name: minio
+  namespace: ($namespace)
+spec:
+  host: minio
+  port: 9000
+  credentials:
+    secretClass: s3-credentials
+---
+apiVersion: secrets.kubedoop.dev/v1alpha1
+kind: SecretClass
+metadata:
+  name: s3-credentials
+  namespace: ($namespace)
+spec:
+  backend:
+    k8sSearch:
+      searchNamespace:
+        pod: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+  namespace: ($namespace)
+  labels:
+    secrets.kubedoop.dev/class: s3-credentials
+stringData:
+  ACCESS_KEY: ($minio_user)
+  SECRET_KEY: ($minio_password)
