@@ -1,0 +1,16 @@
+apiVersion: authentication.kubedoop.dev/v1alpha1
+kind: AuthenticationClass
+metadata:
+  name: oidc
+spec:
+  provider:
+    oidc:
+      hostname: (join('', ['keycloak.', ($namespace), '.svc.cluster.local']))
+      port: 8080
+      rootPath: (join('', ['/realms/', ($keycloak_realm)]))
+      providerHint: keycloak
+      scopes:
+      - openid
+      - email
+      - profile
+      principalClaim: preferred_username

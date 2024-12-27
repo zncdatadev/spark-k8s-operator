@@ -3,6 +3,8 @@ kind: SparkHistoryServer
 metadata:
   name: sparkhistory
 spec:
+  image:
+    productVersion: ($values.product_version)
   clusterConfig:
     listenerClass: cluster-internal
     authentication:
