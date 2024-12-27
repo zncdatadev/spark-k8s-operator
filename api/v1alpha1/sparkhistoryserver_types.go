@@ -165,10 +165,6 @@ type RoleSpec struct {
 	RoleConfig *commonsv1alpha1.RoleConfigSpec `json:"roleConfig,omitempty"`
 }
 
-type ConfigOverridesSpec struct {
-	SparkConfig map[string]string `json:"spark-defaults.conf,omitempty"`
-}
-
 type ConfigSpec struct {
 	*commonsv1alpha1.RoleGroupConfigSpec `json:",inline"`
 
