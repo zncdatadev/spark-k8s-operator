@@ -20,3 +20,10 @@ spec:
     roleGroups:
       default:
         replicas: 1
+        # config:
+        #   resources:
+        #     cpu:
+        #       max: 650m
+        #       min: 300m
+        #     memory:
+        #       limit: 800Mi

@@ -68,6 +68,8 @@ spec:
         file: oidc-authenticationclass.yaml
     - apply:
         file: sparkhistoryserver.yaml
+    - sleep:
+        duration: 100s
     - assert:
         file: sparkhistoryserver-assert.yaml
     cleanup:
@@ -86,7 +88,7 @@ spec:
       - describe:
           apiVersion: v1
           kind: Pod
-          selector: app.kubernetes.io/instance=sparkhistory
+          # selector: app.kubernetes.io/instance=sparkhistory
       - podLogs:
           selector: app.kubernetes.io/instance=sparkhistory
           tail: -1
@@ -106,3 +108,13 @@ spec:
 
             echo "asserting the OIDC login"
             kubectl exec -n $NAMESPACE testing-tools-0 -- python /tmp/oidc-login-assert.py
+    catch:
+      - script:
+          env:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            set -ex
+            kubectl -n $NAMESPACE get pods
+            kubectl -n $NAMESPACE describe pods
+            kubectl -n $NAMESPACE logs testing-tools-0

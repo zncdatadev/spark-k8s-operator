@@ -20,6 +20,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
@@ -135,6 +136,21 @@ func (b *DeploymentBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.
 	containerBuilder.AddPorts(b.Ports)
 	containerBuilder.AddEnvVars(b.getMainContainerEnvVars())
 	containerBuilder.SetSecurityContext(0, 0, false)
+
+	probe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(18080),
+			},
+		},
+		InitialDelaySeconds: 10,
+		TimeoutSeconds:      5,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+	}
+	containerBuilder.SetReadinessProbe(probe)
+	containerBuilder.SetLivenessProbe(probe)
+
 	return containerBuilder
 }
 
@@ -316,7 +332,7 @@ func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Conta
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceCPU:    resource.MustParse("600m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},

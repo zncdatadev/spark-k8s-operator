@@ -76,3 +76,16 @@ spec:
     cleanup:
     - sleep:
         duration: 50s
+    catch:
+      - script:
+          env:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            kubectl -n $NAMESPACE describe pods
+      - podLogs:
+          selector: app.kubernetes.io/instance=vector-aggregator
+          tail: -1
+      - podLogs:
+          selector: app.kubernetes.io/instance=sparkhistory
+          tail: -1
