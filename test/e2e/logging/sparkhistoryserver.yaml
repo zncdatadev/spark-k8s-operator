@@ -1,0 +1,23 @@
+apiVersion: spark.kubedoop.dev/v1alpha1
+kind: SparkHistoryServer
+metadata:
+  name: sparkhistory
+spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterConfig:
+    listenerClass: cluster-internal
+    logFileDirectory:
+      s3:
+        prefix: events
+        bucket:
+          reference: spark-history
+    vectorAggregatorConfigMapName: vector-aggregator-discovery
+
+  node:
+    roleGroups:
+      default:
+        replicas: 1
+        config:
+          logging:
+            enableVectorAgent: true
