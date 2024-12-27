@@ -1,0 +1,7 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-sparkhistoryserver-node-default
+status:
+  availableReplicas: 2
+  replicas: 2
