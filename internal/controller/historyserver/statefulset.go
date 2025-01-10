@@ -36,17 +36,17 @@ const (
 	MaxLogFileSize = "10Mi"
 )
 
-var _ builder.DeploymentBuilder = &DeploymentBuilder{}
+var _ builder.StatefulSetBuilder = &StatefulSetBuilder{}
 
-type DeploymentBuilder struct {
-	builder.Deployment
+type StatefulSetBuilder struct {
+	builder.StatefulSet
 	Ports          []corev1.ContainerPort
 	ClusteerConfig *shsv1alpha1.ClusterConfigSpec
 	ClusterName    string
 	RoleName       string
 }
 
-func NewDeploymentBuilder(
+func NewStatefulSetBuilder(
 	client *resourceClient.Client,
 	name string,
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
@@ -56,9 +56,9 @@ func NewDeploymentBuilder(
 	overrides *commonsv1alpha1.OverridesSpec,
 	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
 	options ...builder.Option,
-) *DeploymentBuilder {
-	return &DeploymentBuilder{
-		Deployment: *builder.NewDeployment(
+) *StatefulSetBuilder {
+	return &StatefulSetBuilder{
+		StatefulSet: *builder.NewStatefulSetBuilder(
 			client,
 			name,
 			replicas,
@@ -72,7 +72,7 @@ func NewDeploymentBuilder(
 	}
 }
 
-func (b *DeploymentBuilder) getS3LogConfig(ctx context.Context) (*S3Logconfig, error) {
+func (b *StatefulSetBuilder) getS3LogConfig(ctx context.Context) (*S3Logconfig, error) {
 	if b.ClusteerConfig.LogFileDirectory.S3 == nil {
 		return nil, nil
 	}
@@ -87,7 +87,7 @@ func (b *DeploymentBuilder) getS3LogConfig(ctx context.Context) (*S3Logconfig, e
 	return s3Logconfig, nil
 }
 
-func (b *DeploymentBuilder) getMainContainerCmdArgs(s3LogConfig *S3Logconfig) string {
+func (b *StatefulSetBuilder) getMainContainerCmdArgs(s3LogConfig *S3Logconfig) string {
 	s3LogCmdArgs := ""
 
 	if s3LogConfig != nil {
@@ -105,7 +105,7 @@ echo ""
 	return util.IndentTab4Spaces(args)
 }
 
-func (b *DeploymentBuilder) getMainContainerEnvVars() []corev1.EnvVar {
+func (b *StatefulSetBuilder) getMainContainerEnvVars() []corev1.EnvVar {
 	jvmOpts := []string{
 		"-Dlog4j.configurationFile=" + path.Join(constants.KubedoopConfigDir, "log4j2.properties"),
 		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar=8090:"+path.Join(constants.KubedoopJmxDir, "config.yaml")),
@@ -129,7 +129,7 @@ func (b *DeploymentBuilder) getMainContainerEnvVars() []corev1.EnvVar {
 	return envVars
 }
 
-func (b *DeploymentBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.Container {
+func (b *StatefulSetBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.Container {
 	containerBuilder := builder.NewContainer(SparkHistoryContainerName, b.GetImage())
 	containerBuilder.SetCommand([]string{"/bin/bash", "-c"})
 	containerBuilder.SetArgs([]string{b.getMainContainerCmdArgs(s3LogConfig)})
@@ -154,7 +154,7 @@ func (b *DeploymentBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.
 	return containerBuilder
 }
 
-func (b *DeploymentBuilder) addSparkDefaultConfigVolume(containerBuilder *builder.Container) {
+func (b *StatefulSetBuilder) addSparkDefaultConfigVolume(containerBuilder *builder.Container) {
 	volume := &corev1.Volume{
 		Name: ConfigVolumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -176,7 +176,7 @@ func (b *DeploymentBuilder) addSparkDefaultConfigVolume(containerBuilder *builde
 	containerBuilder.AddVolumeMount(volumeMount)
 }
 
-func (b *DeploymentBuilder) addS3CrenditialVolume(containerBuilder *builder.Container, s3LogConfig *S3Logconfig) {
+func (b *StatefulSetBuilder) addS3CrenditialVolume(containerBuilder *builder.Container, s3LogConfig *S3Logconfig) {
 	if s3LogConfig == nil {
 		return
 	}
@@ -189,7 +189,7 @@ func (b *DeploymentBuilder) addS3CrenditialVolume(containerBuilder *builder.Cont
 }
 
 // add log volume to container
-func (b *DeploymentBuilder) addLogVolume(containerBuilder *builder.Container) {
+func (b *StatefulSetBuilder) addLogVolume(containerBuilder *builder.Container) {
 	volume := &corev1.Volume{
 		Name: LogVolumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -211,7 +211,7 @@ func (b *DeploymentBuilder) addLogVolume(containerBuilder *builder.Container) {
 	containerBuilder.AddVolumeMount(volumeMount)
 }
 
-func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Container, error) {
+func (b *StatefulSetBuilder) getOidcContainer(ctx context.Context) (*corev1.Container, error) {
 	authClass := &authv1alpha1.AuthenticationClass{}
 	if err := b.Client.GetWithOwnerNamespace(ctx, b.ClusteerConfig.Authentication.AuthenticationClass, authClass); err != nil {
 		return nil, err
@@ -342,7 +342,7 @@ func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Conta
 	return oidcContainer, nil
 }
 
-func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error) {
+func (b *StatefulSetBuilder) Build(ctx context.Context) (ctrlclient.Object, error) {
 	s3LogConfig, err := b.getS3LogConfig(ctx)
 	if err != nil {
 		return nil, err
@@ -381,7 +381,7 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 	return obj, nil
 }
 
-func NewDeploymentReconciler(
+func NewStatefulSetReconciler(
 	client *resourceClient.Client,
 	roleGroupInfo reconciler.RoleGroupInfo,
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
@@ -392,9 +392,9 @@ func NewDeploymentReconciler(
 	overrides *commonsv1alpha1.OverridesSpec,
 	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
 	options ...builder.Option,
-) (*reconciler.Deployment, error) {
+) (*reconciler.StatefulSet, error) {
 
-	b := NewDeploymentBuilder(
+	b := NewStatefulSetBuilder(
 		client,
 		roleGroupInfo.GetFullName(),
 		clusterConfig,
@@ -406,7 +406,7 @@ func NewDeploymentReconciler(
 		options...,
 	)
 
-	return reconciler.NewDeployment(
+	return reconciler.NewStatefulSet(
 		client,
 		b,
 		stopped,
