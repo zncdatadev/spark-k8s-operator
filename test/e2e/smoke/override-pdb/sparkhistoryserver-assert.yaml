@@ -1,7 +1,9 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: test-sparkhistoryserver-node-default
 status:
   availableReplicas: 2
+  currentReplicas: 2
   replicas: 2
+  updatedReplicas: 2
