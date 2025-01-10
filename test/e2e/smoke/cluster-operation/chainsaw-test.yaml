@@ -67,7 +67,7 @@ spec:
     - assert:
         bindings:
           - name: available_replicas
-            value: 1
+            value: 0
         file: sparkhistoryserver-assert.yaml
     # restart sparkhistoryserver-sparkhistoryserver cluster, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
   - name: restart sparkhistoryserver-sparkhistoryserver cluster
