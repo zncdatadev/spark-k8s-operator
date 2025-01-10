@@ -4,38 +4,40 @@ metadata:
   name: oidc
 spec:
   bindings:
-  - name: MINIO_USER
-    value: miniouser
-  - name: MINIO_PASSWORD
-    value: miniouserpassword
-  - name: MINIO_BUCKET
+  - name: minio_user
+    value: spark
+  - name: minio_password
+    value: sparkspark
+  - name: minio_bucket
     value: spark-history
-  - name: KEYCLOAK_REALM
+  - name: keycloak_realm
     value: kubedoop
-  - name: KEYCLOAK_CLIENT_ID
+  - name: keycloak_client_id
     value: auth2-proxy
-  - name: KEYCLOAK_CLIENT_SECRET
+  - name: keycloak_client_secret
     value: auth2-proxy
-  - name: KEYCLOAK_USER
+  - name: keycloak_user
     value: user
-  - name: KEYCLOAK_PASSWORD
+  - name: keycloak_password
     value: password
   steps:
-  - try:
-    - apply:
-        file: ../setup/minio.yaml
-    - assert:
-        file: ../setup/minio-assert.yaml
-  - try:
-    - apply:
-        file: ../setup/spark-s3-credentials.yaml
-    - assert:
-        file: ../setup/spark-s3-credentials-assert.yaml
-    - apply:
-        file: ../setup/s3bucket.yaml
-    - assert:
-        file: ../setup/s3bucket.yaml
-  - try:
+  - name: install minio
+    try:
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+          - name: MINIO_USER
+            value: ($minio_user)
+          - name: MINIO_PASSWORD
+            value: ($minio_password)
+        content: |
+          envsubst < ../setup/minio-secret.yaml | kubectl apply -f -
+    - script:
+        content: |
+          bash ../setup/minio-install.sh
+  - name: install keycloak
+    try:
     - apply:
         file: keycloak.yaml
     - script:
@@ -43,27 +45,31 @@ spec:
           - name: NAMESPACE
             value: ($namespace)
           - name: KEYCLOAK_REALM
-            value: ($KEYCLOAK_REALM)
+            value: ($keycloak_realm)
           - name: KEYCLOAK_USER
-            value: ($KEYCLOAK_USER)
+            value: ($keycloak_user)
           - name: KEYCLOAK_PASSWORD
-            value: ($KEYCLOAK_PASSWORD)
+            value: ($keycloak_password)
           - name: KEYCLOAK_CLIENT_ID
-            value: ($KEYCLOAK_CLIENT_ID)
+            value: ($keycloak_client_id)
           - name: KEYCLOAK_CLIENT_SECRET
-            value: ($KEYCLOAK_CLIENT_SECRET)
+            value: ($keycloak_client_secret)
         content: |
           cat keycloak-config.yaml | envsubst | kubectl apply -n $NAMESPACE -f -
     - assert:
         file: keycloak-assert.yaml
-  - try:
+  - name: install sparkhistoryserver cluster
+    try:
+    - apply:
+        file: ../setup/minio-s3-connection.yaml
     - apply:
         file: oidc-credentials.yaml
     - apply:
-        file: authenticationclass.yaml
-  - try:
+        file: oidc-authenticationclass.yaml
     - apply:
         file: sparkhistoryserver.yaml
+    - sleep:
+        duration: 100s
     - assert:
         file: sparkhistoryserver-assert.yaml
     cleanup:
@@ -82,7 +88,33 @@ spec:
       - describe:
           apiVersion: v1
           kind: Pod
-          selector: app.kubernetes.io/instance=sparkhistory
+          # selector: app.kubernetes.io/instance=sparkhistory
       - podLogs:
           selector: app.kubernetes.io/instance=sparkhistory
           tail: -1
+  - name: test OIDC authentication
+    try:
+      - apply:
+          file: ../setup/testing-tools-install.yaml
+      - assert:
+          file: ../setup/testing-tools-assert.yaml
+      - script:
+          env:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            echo "env subst from oidc-login-assert.py"
+            envsubst < oidc-login-assert.py | kubectl exec -n $NAMESPACE -i testing-tools-0 -- tee /tmp/oidc-login-assert.py > /dev/null
+
+            echo "asserting the OIDC login"
+            kubectl exec -n $NAMESPACE testing-tools-0 -- python /tmp/oidc-login-assert.py
+    catch:
+      - script:
+          env:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            set -ex
+            kubectl -n $NAMESPACE get pods
+            kubectl -n $NAMESPACE describe pods
+            kubectl -n $NAMESPACE logs testing-tools-0

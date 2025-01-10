@@ -12,6 +12,10 @@ import (
 
 var _ reconciler.Reconciler = &ClusterReconciler{}
 
+const (
+	RoleName = "node"
+)
+
 type ClusterReconciler struct {
 	reconciler.BaseCluster[*shsv1alpha1.SparkHistoryServerSpec]
 	ClusterConfig *shsv1alpha1.ClusterConfigSpec
@@ -55,7 +59,7 @@ func (r *ClusterReconciler) GetImage() *util.Image {
 func (r *ClusterReconciler) RegisterResource(ctx context.Context) error {
 	roleInfo := reconciler.RoleInfo{
 		ClusterInfo: r.ClusterInfo,
-		RoleName:    "node",
+		RoleName:    RoleName,
 	}
 
 	node := NewNodeRoleReconciler(

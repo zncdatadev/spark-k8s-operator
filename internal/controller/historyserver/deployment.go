@@ -15,10 +15,12 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/builder"
 	resourceClient "github.com/zncdatadev/operator-go/pkg/client"
 	"github.com/zncdatadev/operator-go/pkg/constants"
+	"github.com/zncdatadev/operator-go/pkg/productlogging"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
@@ -26,11 +28,12 @@ import (
 
 const (
 	SparkConfigDefauleFileName = "spark-defaults.conf"
-	SparkHistoryContainerName  = "spark-history"
+	SparkHistoryContainerName  = RoleName
 
-	LogVolumeName = "log"
-
+	LogVolumeName    = builder.LogDataVolumeName
 	ConfigVolumeName = "config"
+
+	MaxLogFileSize = "10Mi"
 )
 
 var _ builder.DeploymentBuilder = &DeploymentBuilder{}
@@ -92,9 +95,6 @@ func (b *DeploymentBuilder) getMainContainerCmdArgs(s3LogConfig *S3Logconfig) st
 	}
 
 	args := `
-# TODO: remove this when refactor spark dockerfile
-# fix jar conflict in container image
-rm -rf jars/slf4j-api-1.7.36.jar
 
 mkdir -p ` + constants.KubedoopConfigDir + `
 cp ` + path.Join(constants.KubedoopConfigDirMount, `*`) + " " + constants.KubedoopConfigDir + `
@@ -117,6 +117,10 @@ func (b *DeploymentBuilder) getMainContainerEnvVars() []corev1.EnvVar {
 			Value: "true",
 		},
 		{
+			Name:  "SPARK_DAEMON_CLASSPATH",
+			Value: "/kubedoop/spark/extra-jars/*",
+		},
+		{
 			Name:  "SPARK_HISTORY_OPTS",
 			Value: strings.Join(jvmOpts, " "),
 		},
@@ -132,6 +136,21 @@ func (b *DeploymentBuilder) getMainContainer(s3LogConfig *S3Logconfig) *builder.
 	containerBuilder.AddPorts(b.Ports)
 	containerBuilder.AddEnvVars(b.getMainContainerEnvVars())
 	containerBuilder.SetSecurityContext(0, 0, false)
+
+	probe := &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			TCPSocket: &corev1.TCPSocketAction{
+				Port: intstr.FromInt(18080),
+			},
+		},
+		InitialDelaySeconds: 10,
+		TimeoutSeconds:      5,
+		PeriodSeconds:       10,
+		SuccessThreshold:    1,
+	}
+	containerBuilder.SetReadinessProbe(probe)
+	containerBuilder.SetLivenessProbe(probe)
+
 	return containerBuilder
 }
 
@@ -166,6 +185,29 @@ func (b *DeploymentBuilder) addS3CrenditialVolume(containerBuilder *builder.Cont
 	b.AddVolume(volume)
 
 	volumeMount := s3LogConfig.GetVolumeMount()
+	containerBuilder.AddVolumeMount(volumeMount)
+}
+
+// add log volume to container
+func (b *DeploymentBuilder) addLogVolume(containerBuilder *builder.Container) {
+	volume := &corev1.Volume{
+		Name: LogVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{
+				SizeLimit: func() *resource.Quantity {
+					q := resource.MustParse(MaxLogFileSize)
+					size := productlogging.CalculateLogVolumeSizeLimit([]resource.Quantity{q})
+					return &size
+				}(),
+			},
+		},
+	}
+	b.AddVolume(volume)
+
+	volumeMount := &corev1.VolumeMount{
+		Name:      LogVolumeName,
+		MountPath: constants.KubedoopLogDir,
+	}
 	containerBuilder.AddVolumeMount(volumeMount)
 }
 
@@ -272,8 +314,12 @@ func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Conta
 				Value: "0.0.0.0:4180",
 			},
 			{
-				Name:  "OAUTH2_PROXY_REDIRECT_URL",
-				Value: "http://localhost:4180/oauth2/callback",
+				Name:  "OAUTH2_PROXY_COOKIE_SECURE", // https://github.com/oauth2-proxy/oauth2-proxy/blob/c64ec1251b8366b48c6c445bbeb307b18fcb314f/oauthproxy.go#L1091
+				Value: "false",
+			},
+			{
+				Name:  "OAUTH2_PROXY_WHITELIST_DOMAINS",
+				Value: "*",
 			},
 			{
 				Name:  "OAUTH2_PROXY_CODE_CHALLENGE_METHOD",
@@ -286,7 +332,7 @@ func (b *DeploymentBuilder) getOidcContainer(ctx context.Context) (*corev1.Conta
 		},
 		Resources: corev1.ResourceRequirements{
 			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1000m"),
+				corev1.ResourceCPU:    resource.MustParse("600m"),
 				corev1.ResourceMemory: resource.MustParse("512Mi"),
 			},
 		},
@@ -304,6 +350,7 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 
 	mainContainer := b.getMainContainer(s3LogConfig)
 	b.addS3CrenditialVolume(mainContainer, s3LogConfig)
+	b.addLogVolume(mainContainer)
 	b.addSparkDefaultConfigVolume(mainContainer)
 
 	b.AddContainer(mainContainer.Build())
@@ -316,21 +363,21 @@ func (b *DeploymentBuilder) Build(ctx context.Context) (ctrlclient.Object, error
 		b.AddContainer(oidcContainer)
 	}
 
+	if b.ClusteerConfig != nil && b.ClusteerConfig.VectorAggregatorConfigMapName != "" {
+		vectorBuilder := builder.NewVector(
+			ConfigVolumeName,
+			LogVolumeName,
+			b.GetImage(),
+		)
+
+		b.AddContainer(vectorBuilder.GetContainer())
+		b.AddVolumes(vectorBuilder.GetVolumes())
+	}
+
 	obj, err := b.GetObject()
 	if err != nil {
 		return nil, err
 	}
-
-	if b.ClusteerConfig != nil && b.ClusteerConfig.VectorAggregatorConfigMapName != "" {
-		builder.NewVectorDecorator(
-			obj,
-			b.GetImage(),
-			LogVolumeName,
-			ConfigVolumeName,
-			b.ClusteerConfig.VectorAggregatorConfigMapName,
-		)
-	}
-
 	return obj, nil
 }
 

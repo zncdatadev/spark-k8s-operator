@@ -1,8 +1,13 @@
 apiVersion: spark.kubedoop.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
-  name: sparkhistory
+  name: test-sparkhistoryserver
 spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterOperation:
+    reconciliationPaused: ($cluster_paused)
+    stopped: ($cluster_stopped)
   clusterConfig:
     listenerClass: cluster-internal
     logFileDirectory:
@@ -11,9 +16,6 @@ spec:
         bucket:
           reference: spark-history
   node:
-    roleConfig:
-      podDisruptionBudget:
-        maxUnavailable: 2
     roleGroups:
       default:
         replicas: 1

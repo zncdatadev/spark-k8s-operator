@@ -29,14 +29,14 @@ spec:
         resources:
           limits:
             memory: "1Gi"
-            cpu: "1000m"
+            cpu: "850m"
         ports:
         - containerPort: 8080
           name: http
         readinessProbe:
           httpGet:
             scheme: HTTP
-            path: (join('', ['/realms/', ($KEYCLOAK_REALM)]))
+            path: (join('', ['/realms/', ($keycloak_realm)]))
             port: 8080
         volumeMounts:
         - name: keycloak-config
@@ -54,5 +54,5 @@ spec:
   selector:
     app: keycloak
   ports:
-  - port: 80
+  - port: 8080
     targetPort: http

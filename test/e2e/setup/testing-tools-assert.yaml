@@ -1,8 +1,7 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: minio
+  name: testing-tools
 status:
   readyReplicas: 1
-  availableReplicas: 1
   replicas: 1

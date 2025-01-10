@@ -1,0 +1,53 @@
+apiVersion: spark.kubedoop.dev/v1alpha1
+kind: SparkHistoryServer
+metadata:
+  name: test-sparkhistoryserver
+spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterConfig:
+    listenerClass: cluster-internal
+    logFileDirectory:
+      s3:
+        prefix: events
+        bucket:
+          reference: spark-history
+  node:
+    roleConfig:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+    envOverrides:
+        COMMON_VAR: role-value # overridden by role group below
+        ROLE_VAR: role-value   # only defined here at role level
+    configOverrides: # TODO: the configOverrides feature is not yet implemented
+      security.properties:
+        COMMON_VAR: role-value # overridden by role group below
+        ROLE_VAR: role-value   # only defined here at role level
+      spark-env.sh:
+        COMMON_VAR: role-value # overridden by role group below
+        ROLE_VAR: role-value   # only defined here at role level
+    roleGroups:
+      default:
+        replicas: 2
+        envOverrides:
+          COMMON_VAR: group-value # overrides role value
+          GROUP_VAR: group-value # only defined here at group level
+        configOverrides: # TODO: the configOverrides feature is not yet implemented
+          security.properties:
+            COMMON_VAR: group-value # overrides role value
+            GROUP_VAR: group-value # only defined here at group level
+          spark-env.sh:
+            COMMON_VAR: group-value # overrides role value
+            GROUP_VAR: group-value # only defined here at group level
+        podOverrides:
+          spec:
+            containers:
+              - name: node
+                resources:
+                  requests:
+                    cpu: 300m
+                    memory: 526Mi
+                  limits:
+                    cpu: 350m
+                    memory: 1300Mi

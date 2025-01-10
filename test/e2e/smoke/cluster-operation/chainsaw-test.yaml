@@ -1,0 +1,93 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: smoke-cluster-operation
+spec:
+  bindings:
+  - name: minio_user
+    value: spark
+  - name: minio_password
+    value: sparkspark
+  - name: minio_bucket
+    value: spark-history
+  - name: cluster_stopped
+    value: false
+  - name: cluster_paused
+    value: false
+  steps:
+  - name: install minio
+    try:
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+          - name: MINIO_USER
+            value: ($minio_user)
+          - name: MINIO_PASSWORD
+            value: ($minio_password)
+        content: |
+          envsubst < ../../setup/minio-secret.yaml | kubectl apply -f -
+    - script:
+        content: |
+          bash ../../setup/minio-install.sh
+  - name: install sparkhistoryserver
+    try:
+    # install sparkhistoryserver sparkhistoryserver, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
+    - apply:
+        file: ../../setup/minio-s3-connection.yaml
+    - apply:
+        file: sparkhistoryserver.yaml
+    - assert:
+        bindings:
+          - name: available_replicas
+            value: 1
+        file: sparkhistoryserver-assert.yaml
+  - name: stop sparkhistoryserver-sparkhistoryserver cluster
+    try:
+    - apply:
+        bindings:
+          - name: cluster_stopped
+            value: true
+        file: sparkhistoryserver.yaml
+    - assert:
+        resource: # TODO: refactor the sparkhistoryserver kind to statefulset
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: test-sparkhistoryserver-node-default
+          status:
+            conditions:
+              - reason: MinimumReplicasAvailable
+                type: Available
+                status: "True"
+              - reason: NewReplicaSetAvailable
+                type: Progressing
+                status: "True"
+            observedGeneration: 2
+    # pause sparkhistoryserver-sparkhistoryserver cluster, clusterOperation.reconciliationPaused: true
+  - name: pause sparkhistoryserver-sparkhistoryserver cluster
+    try:
+    - apply:
+        bindings:
+          - name: cluster_paused
+            value: true
+          - name: cluster_stopped
+            value: false
+        file: sparkhistoryserver.yaml
+    - assert:
+        resource:
+          apiVersion: apps/v1
+          kind: Deployment
+    # restart sparkhistoryserver-sparkhistoryserver cluster, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
+  - name: restart sparkhistoryserver-sparkhistoryserver cluster
+    try:
+    - apply:
+        file: sparkhistoryserver.yaml
+    - assert:
+        bindings:
+          - name: available_replicas
+            value: 1
+        file: sparkhistoryserver-assert.yaml
+    cleanup:
+    - sleep:
+        duration: 30s
