@@ -117,7 +117,7 @@ func (r *NodeRoleReconciler) GetImageResourceWithRoleGroup(
 		options,
 	)
 
-	deployment, err := NewDeploymentReconciler(
+	sts, err := NewStatefulSetReconciler(
 		r.Client,
 		info,
 		r.ClusterConfig,
@@ -146,5 +146,5 @@ func (r *NodeRoleReconciler) GetImageResourceWithRoleGroup(
 			o.Annotations = info.GetAnnotations()
 		},
 	)
-	return []reconciler.Reconciler{cm, deployment, svc}, nil
+	return []reconciler.Reconciler{cm, sts, svc}, nil
 }

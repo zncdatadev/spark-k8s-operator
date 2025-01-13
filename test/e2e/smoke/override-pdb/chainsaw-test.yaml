@@ -61,29 +61,7 @@ spec:
   - name: assert podOverride
     try:
     - assert:
-        timeout: 240s
-        resource:
-          kind: Deployment
-          apiVersion: apps/v1
-          metadata:
-            name: test-sparkhistoryserver-node-default
-            namespace: ($namespace)
-          spec:
-            template:
-              spec:
-                containers:
-                - name: node
-                  resources:
-                    requests:
-                      cpu: 300m
-                      memory: 526Mi
-                    limits:
-                      cpu: 350m
-                      memory: 1300Mi
-          status:
-            replicas: 2
-            readyReplicas: 2
-            availableReplicas: 2
+        file: sparkhistoryserver-assert.yaml
   - name: test env overrides
     try:
     - script:
@@ -92,9 +70,9 @@ spec:
           value: ($namespace)
         content: |
           #!/bin/bash
-          kubectl -n $NAMESPACE get deployment test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
-          kubectl -n $NAMESPACE get deployment test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
-          kubectl -n $NAMESPACE get deployment test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
+          kubectl -n $NAMESPACE get sts test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
+          kubectl -n $NAMESPACE get sts test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
+          kubectl -n $NAMESPACE get sts test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
   - name: run spark example
     try:
     - sleep:

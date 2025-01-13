@@ -50,20 +50,10 @@ spec:
             value: true
         file: sparkhistoryserver.yaml
     - assert:
-        resource: # TODO: refactor the sparkhistoryserver kind to statefulset
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: test-sparkhistoryserver-node-default
-          status:
-            conditions:
-              - reason: MinimumReplicasAvailable
-                type: Available
-                status: "True"
-              - reason: NewReplicaSetAvailable
-                type: Progressing
-                status: "True"
-            observedGeneration: 2
+        bindings:
+          - name: available_replicas
+            value: 0
+        file: sparkhistoryserver-assert.yaml
     # pause sparkhistoryserver-sparkhistoryserver cluster, clusterOperation.reconciliationPaused: true
   - name: pause sparkhistoryserver-sparkhistoryserver cluster
     try:
@@ -75,9 +65,10 @@ spec:
             value: false
         file: sparkhistoryserver.yaml
     - assert:
-        resource:
-          apiVersion: apps/v1
-          kind: Deployment
+        bindings:
+          - name: available_replicas
+            value: 0
+        file: sparkhistoryserver-assert.yaml
     # restart sparkhistoryserver-sparkhistoryserver cluster, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
   - name: restart sparkhistoryserver-sparkhistoryserver cluster
     try:
