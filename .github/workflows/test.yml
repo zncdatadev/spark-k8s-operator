@@ -41,7 +41,7 @@ jobs:
           '1.32.0'
         ]
         product_version: ['3.5.1'] # TODO: 3.5.2 image is constructing, should added after it is ready
-      max-parallel: 1
+      # max-parallel: 1
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
