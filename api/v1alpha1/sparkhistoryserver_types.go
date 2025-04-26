@@ -25,10 +25,9 @@ import (
 )
 
 const (
-	DefaultRepository      = "quay.io/zncdatadev"
-	DefaultProductVersion  = "3.5.1"
-	DefaultKubedoopVersion = "0.0.0-dev"
-	DefaultProductName     = "spark-k8s"
+	DefaultRepository     = "quay.io/zncdatadev"
+	DefaultProductVersion = "3.5.1"
+	DefaultProductName    = "spark-k8s"
 )
 
 // https://book.kubebuilder.io/reference/generating-crd
@@ -57,6 +56,7 @@ type SparkHistoryServerList struct {
 // SparkHistoryServerSpec defines the desired state of SparkHistoryServer
 type SparkHistoryServerSpec struct {
 	// +kubebuilder:validation:Optional
+	// +default:value={"repo": "quay.io/zncdatadev", "pullPolicy": "IfNotPresent"}
 	Image *ImageSpec `json:"image,omitempty"`
 
 	// spark history server cluster config
@@ -138,7 +138,6 @@ type ImageSpec struct {
 	Repo string `json:"repo,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="0.0.0-dev"
 	KubedoopVersion string `json:"kubedoopVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
