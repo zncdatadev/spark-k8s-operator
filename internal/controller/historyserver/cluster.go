@@ -8,6 +8,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/util"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdatadev/spark-k8s-operator/internal/util/version"
 )
 
 var _ reconciler.Reconciler = &ClusterReconciler{}
@@ -40,17 +41,17 @@ func NewClusterReconciler(
 func (r *ClusterReconciler) GetImage() *util.Image {
 	image := util.NewImage(
 		shsv1alpha1.DefaultProductName,
-		shsv1alpha1.DefaultKubedoopVersion,
+		version.BuildVersion,
 		shsv1alpha1.DefaultProductVersion,
+		func(options *util.ImageOptions) {
+			options.Custom = r.Spec.Image.Custom
+			options.Repo = r.Spec.Image.Repo
+			options.PullPolicy = r.Spec.Image.PullPolicy
+		},
 	)
 
-	if r.Spec.Image != nil {
-		image.Custom = r.Spec.Image.Custom
-		image.Repo = r.Spec.Image.Repo
+	if r.Spec.Image.KubedoopVersion != "" {
 		image.KubedoopVersion = r.Spec.Image.KubedoopVersion
-		image.ProductVersion = r.Spec.Image.ProductVersion
-		image.PullPolicy = r.Spec.Image.PullPolicy
-		image.PullSecretName = r.Spec.Image.PullSecretName
 	}
 
 	return image
