@@ -46,8 +46,8 @@ spec:
               - name: node
                 resources:
                   requests:
-                    cpu: 300m
+                    cpu: 200m
                     memory: 526Mi
                   limits:
-                    cpu: 350m
+                    cpu: 250m
                     memory: 1300Mi
