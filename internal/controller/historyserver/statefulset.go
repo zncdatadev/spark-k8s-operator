@@ -382,8 +382,7 @@ func (b *StatefulSetBuilder) Build(ctx context.Context) (ctrlclient.Object, erro
 }
 
 func NewStatefulSetReconciler(
-	client *// It looks like `resour` is a typo in the code snippet provided. It seems to be a partial word or variable name that is not defined or used within the context of the code. If you need further assistance or clarification on a specific part of the code, please let me know!
-	resourceClient.Client,
+	client *resourceClient.Client,
 	roleGroupInfo reconciler.RoleGroupInfo,
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
 	ports []corev1.ContainerPort,

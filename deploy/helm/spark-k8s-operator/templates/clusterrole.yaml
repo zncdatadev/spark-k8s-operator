@@ -49,6 +49,18 @@ rules:
   - list
   - watch
 - apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - s3.kubedoop.dev
   resources:
   - s3buckets
@@ -83,4 +95,5 @@ rules:
   - get
   - patch
   - update
+
 {{- end }}
