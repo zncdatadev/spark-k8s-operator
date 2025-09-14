@@ -58,6 +58,12 @@ spec:
             expectedPods: 2
             currentHealthy: 2
             disruptionsAllowed: 1
+    catch:
+      - script:
+          content: |
+            #!/bin/bash
+            kubectl -n $NAMESPACE describe pods
+
   - name: assert podOverride
     try:
     - assert:
