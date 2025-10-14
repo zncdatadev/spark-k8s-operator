@@ -26,7 +26,7 @@ import (
 
 const (
 	DefaultRepository     = "quay.io/zncdatadev"
-	DefaultProductVersion = "3.5.1"
+	DefaultProductVersion = "3.5.5"
 	DefaultProductName    = "spark-k8s"
 )
 
@@ -141,7 +141,6 @@ type ImageSpec struct {
 	KubedoopVersion string `json:"kubedoopVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="3.5.1"
 	ProductVersion string `json:"productVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
