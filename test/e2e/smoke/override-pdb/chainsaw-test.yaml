@@ -4,32 +4,19 @@ metadata:
   name: smoke-override-pdb
 spec:
   bindings:
-  - name: minio_user
+  - name: SPARK_MINIO_USER
     value: spark
-  - name: minio_password
+  - name: SPARK_MINIO_PASSWORD
     value: sparkspark
-  - name: minio_bucket
+  - name: SPARK_MINIO_BUCKET
     value: spark-history
-  - name: cluster_stopped
-    value: false
-  - name: cluster_paused
-    value: false
   steps:
   - name: install minio
     try:
-    - script:
-        env:
-          - name: NAMESPACE
-            value: ($namespace)
-          - name: MINIO_USER
-            value: ($minio_user)
-          - name: MINIO_PASSWORD
-            value: ($minio_password)
-        content: |
-          envsubst < ../../setup/minio-secret.yaml | kubectl apply -f -
-    - script:
-        content: |
-          bash ../../setup/minio-install.sh
+    - apply:
+        file: ../../setup/minio.yaml
+    - assert:
+        file: ../../setup/minio-assert.yaml
   - name: install sparkhistoryserver
     try:
     # install sparkhistoryserver sparkhistoryserver, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
@@ -82,7 +69,7 @@ spec:
   - name: run spark example
     try:
     - sleep:
-        duration: 240s
+        duration: 10s
     - script:
         bindings:
         - name: NAMESPACE
@@ -112,8 +99,6 @@ spec:
           kubectl -n $NAMESPACE exec $POD -- /bin/bash -c "$script"
   - name: verify history server
     try:
-    - sleep:
-        duration: 20s
     - script:
         bindings:
         - name: NAMESPACE
