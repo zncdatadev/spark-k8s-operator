@@ -4,32 +4,19 @@ metadata:
   name: logging
 spec:
   bindings:
-  - name: minio_user
+  - name: SPARK_MINIO_USER
     value: spark
-  - name: minio_password
+  - name: SPARK_MINIO_PASSWORD
     value: sparkspark
-  - name: minio_bucket
+  - name: SPARK_MINIO_BUCKET
     value: spark-history
   steps:
   - name: install minio
     try:
-    - script:
-        env:
-          - name: NAMESPACE
-            value: ($namespace)
-          - name: MINIO_USER
-            value: ($minio_user)
-          - name: MINIO_PASSWORD
-            value: ($minio_password)
-        content: |
-          envsubst < ../setup/minio-secret.yaml | kubectl apply -f -
-    # - apply:
-    #     file: ../setup/minio-secret.yaml
-    - script:
-        content: |
-          bash ../setup/minio-install.sh
-    # - assert:
-    #     file: minio-assert.yaml
+    - apply:
+        file: ../setup/minio.yaml
+    - assert:
+        file: ../setup/minio-assert.yaml
   - name: install vector-aggregator
     try:
     - script:
@@ -54,7 +41,7 @@ spec:
   - name: assert sparkhistoryserver logs
     try:
     - sleep:
-        duration: 50s
+        duration: 20s
     - script:
         env:
           - name: NAMESPACE
@@ -74,8 +61,6 @@ spec:
             exit 1
           fi
     cleanup:
-    - sleep:
-        duration: 50s
     catch:
       - script:
           env:

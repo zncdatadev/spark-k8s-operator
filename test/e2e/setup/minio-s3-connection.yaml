@@ -28,14 +28,3 @@ spec:
     k8sSearch:
       searchNamespace:
         pod: {}
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: s3-credentials
-  namespace: ($namespace)
-  labels:
-    secrets.kubedoop.dev/class: s3-credentials
-stringData:
-  ACCESS_KEY: ($minio_user)
-  SECRET_KEY: ($minio_password)
