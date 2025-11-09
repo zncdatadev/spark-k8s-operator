@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"net/url"
 	"path"
 	"strconv"
@@ -17,13 +18,14 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/constants"
 	"github.com/zncdatadev/operator-go/pkg/productlogging"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
-	"github.com/zncdatadev/operator-go/pkg/util"
+	oputil "github.com/zncdatadev/operator-go/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
+	"github.com/zncdatadev/spark-k8s-operator/internal/util"
 )
 
 const (
@@ -52,7 +54,7 @@ func NewStatefulSetBuilder(
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
 	replicas *int32,
 	ports []corev1.ContainerPort,
-	image *util.Image,
+	image *oputil.Image,
 	overrides *commonsv1alpha1.OverridesSpec,
 	roleGroupConfig *commonsv1alpha1.RoleGroupConfigSpec,
 	options ...builder.Option,
@@ -102,13 +104,13 @@ cp ` + path.Join(constants.KubedoopConfigDirMount, `*`) + " " + constants.Kubedo
 echo ""
 ` + path.Join(constants.KubedoopRoot, "spark/sbin/start-history-server.sh") + ` --properties-file ` + path.Join(constants.KubedoopConfigDir, SparkConfigDefauleFileName) + `
 `
-	return util.IndentTab4Spaces(args)
+	return oputil.IndentTab4Spaces(args)
 }
 
 func (b *StatefulSetBuilder) getMainContainerEnvVars() []corev1.EnvVar {
 	jvmOpts := []string{
 		"-Dlog4j.configurationFile=" + path.Join(constants.KubedoopConfigDir, "log4j2.properties"),
-		"-javaagent:" + path.Join(constants.KubedoopJmxDir, "jmx_prometheus_javaagent.jar=8090:"+path.Join(constants.KubedoopJmxDir, "config.yaml")),
+		"-javaagent:" + path.Join(constants.KubedoopJmxDir, fmt.Sprintf("jmx_prometheus_javaagent.jar=%d:%s", util.MetricsPort, path.Join(constants.KubedoopJmxDir, "config.yaml"))),
 	}
 
 	envVars := []corev1.EnvVar{
@@ -386,7 +388,7 @@ func NewStatefulSetReconciler(
 	roleGroupInfo reconciler.RoleGroupInfo,
 	clusterConfig *shsv1alpha1.ClusterConfigSpec,
 	ports []corev1.ContainerPort,
-	image *util.Image,
+	image *oputil.Image,
 	replicas *int32,
 	stopped bool,
 	overrides *commonsv1alpha1.OverridesSpec,
