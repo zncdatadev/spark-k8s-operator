@@ -174,7 +174,7 @@ func (b *ConfigMapBuilder) getSparkDefaules(s3Logconfig *S3Logconfig) string {
 	}
 
 	if cleaner {
-		config["spark.history.fs.cleaner.enabled"] = "true"
+		config["spark.history.fs.cleaner.enabled"] = trueValue
 	}
 
 	if s3Logconfig != nil {
