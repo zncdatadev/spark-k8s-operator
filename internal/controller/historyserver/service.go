@@ -32,7 +32,6 @@ func NewRoleGroupMetricsService(
 	// Create service name with -metrics suffix
 	serviceName := util.GetMetricsServiceName(roleGroupInfo)
 
-	// Determine scheme based on TLS configuration
 	scheme := "http"
 	// Prepare labels (copy from roleGroupInfo and add metrics labels)
 	labels := make(map[string]string)
@@ -47,7 +46,7 @@ func NewRoleGroupMetricsService(
 		annotations[k] = v
 	}
 	annotations["prometheus.io/scrape"] = trueValue
-	annotations["prometheus.io/path"] = "/prom"
+	// annotations["prometheus.io/path"] = "/metrics"  // default metrics path is /metrics
 	annotations["prometheus.io/port"] = strconv.Itoa(int(metricsPort))
 	annotations["prometheus.io/scheme"] = scheme
 
