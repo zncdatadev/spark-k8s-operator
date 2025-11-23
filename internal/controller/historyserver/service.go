@@ -1,0 +1,71 @@
+package historyserver
+
+import (
+	"strconv"
+
+	"github.com/zncdatadev/operator-go/pkg/builder"
+	"github.com/zncdatadev/operator-go/pkg/client"
+	opconstants "github.com/zncdatadev/operator-go/pkg/constants"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
+	"github.com/zncdatadev/spark-k8s-operator/internal/util"
+	corev1 "k8s.io/api/core/v1"
+)
+
+// NewRoleGroupMetricsService creates a metrics service reconciler using a simple function approach
+// This creates a headless service for metrics with Prometheus labels and annotations
+func NewRoleGroupMetricsService(
+	client *client.Client,
+	roleGroupInfo *reconciler.RoleGroupInfo,
+) reconciler.Reconciler {
+	// Get metrics port
+	metricsPort := util.GetMetricsPort()
+
+	// Create service ports
+	servicePorts := []corev1.ContainerPort{
+		{
+			Name:          util.HttpPortName,
+			ContainerPort: metricsPort,
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}
+
+	// Create service name with -metrics suffix
+	serviceName := util.GetMetricsServiceName(roleGroupInfo)
+
+	scheme := "http"
+	// Prepare labels (copy from roleGroupInfo and add metrics labels)
+	labels := make(map[string]string)
+	for k, v := range roleGroupInfo.GetLabels() {
+		labels[k] = v
+	}
+	labels["prometheus.io/scrape"] = trueValue
+
+	// Prepare annotations (copy from roleGroupInfo and add Prometheus annotations)
+	annotations := make(map[string]string)
+	for k, v := range roleGroupInfo.GetAnnotations() {
+		annotations[k] = v
+	}
+	annotations["prometheus.io/scrape"] = trueValue
+	// annotations["prometheus.io/path"] = "/metrics"  // default metrics path is /metrics
+	annotations["prometheus.io/port"] = strconv.Itoa(int(metricsPort))
+	annotations["prometheus.io/scheme"] = scheme
+
+	// Create base service builder
+	baseBuilder := builder.NewServiceBuilder(
+		client,
+		serviceName,
+		servicePorts,
+		func(sbo *builder.ServiceBuilderOptions) {
+			sbo.Headless = true
+			sbo.ListenerClass = opconstants.ClusterInternal
+			sbo.Labels = labels
+			sbo.MatchingLabels = roleGroupInfo.GetLabels() // Use original labels for matching
+			sbo.Annotations = annotations
+		},
+	)
+
+	return reconciler.NewGenericResourceReconciler(
+		client,
+		baseBuilder,
+	)
+}

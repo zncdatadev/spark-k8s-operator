@@ -141,7 +141,7 @@ func (s *S3Logconfig) GetPartialProperties() map[string]string {
 	properties := map[string]string{
 		"spark.history.fs.logDirectory":              s.GetLogDirectory(),
 		"spark.hadoop.fs.s3a.endpoint":               s.GetEndpoint(),
-		"spark.hadoop.fs.s3a.path.style.access":      "true",
+		"spark.hadoop.fs.s3a.path.style.access":      trueValue,
 		"spark.hadoop.fs.s3a.connection.ssl.enabled": strconv.FormatBool(sslEnabled),
 	}
 	return properties
