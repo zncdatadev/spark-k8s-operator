@@ -1,0 +1,18 @@
+apiVersion: spark.kubedoop.dev/v1alpha1
+kind: SparkHistoryServer
+metadata:
+  name: test-spark-observability
+spec:
+  image:
+    productVersion: ($values.product_version)
+  clusterConfig:
+    listenerClass: cluster-internal
+    logFileDirectory:
+      s3:
+        prefix: events
+        bucket:
+          reference: spark-history
+  node:
+    roleGroups:
+      default:
+        replicas: 2
