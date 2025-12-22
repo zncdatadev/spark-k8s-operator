@@ -1,0 +1,91 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: submit-task
+spec:
+  bindings:
+  - name: SPARK_MINIO_USER
+    value: spark
+  - name: SPARK_MINIO_PASSWORD
+    value: sparkspark
+  - name: SPARK_MINIO_BUCKET
+    value: spark-history
+  steps:
+  - name: install minio
+    try:
+    - apply:
+        file: ../../setup/minio.yaml
+    - assert:
+        file: ../../setup/minio-assert.yaml
+  - name: install sparkhistoryserver
+    try:
+    # install sparkhistoryserver sparkhistoryserver, clusterOperation.stopped: false, clusterOperation.reconciliationPaused: false
+    - apply:
+        file: ../../setup/minio-s3-connection.yaml
+    - apply:
+        file: sparkhistoryserver.yaml
+    - assert:
+        bindings:
+          - name: available_replicas
+            value: 1
+        file: sparkhistoryserver-assert.yaml
+  - name: run spark example
+    try:
+    - sleep:
+        duration: 10s
+    - script:
+        bindings:
+        - name: NAMESPACE
+          value: ($namespace)
+        content: |
+          #!/bin/bash
+          set -x
+          POD=$(kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=sparkhistoryserver --field-selector status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+
+
+          script=$(cat <<EOF
+          export AWS_ACCESS_KEY_ID=\$(cat /kubedoop/secret/s3-credentials/ACCESS_KEY)
+          export AWS_SECRET_ACCESS_KEY=\$(cat /kubedoop/secret/s3-credentials/SECRET_KEY)
+
+          ./bin/spark-submit \
+            --master local[*] \
+            --deploy-mode client \
+            --conf spark.driver.host=127.0.0.1 \
+            --conf spark.eventLog.enabled=true \
+            --conf spark.eventLog.dir=s3a://spark-history/events \
+            --conf spark.hadoop.fs.s3a.endpoint=http://minio.$NAMESPACE.svc.cluster.local:9000 \
+            --conf spark.hadoop.fs.s3a.path.style.access=true \
+            --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
+            examples/src/main/python/pi.py 2
+          EOF
+          )
+
+          kubectl -n $NAMESPACE exec $POD -- /bin/bash -c "$script"
+  - name: verify history server
+    try:
+    - script:
+        bindings:
+        - name: NAMESPACE
+          value: ($namespace)
+        content: |
+          #!/bin/bash
+          POD=$(kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=sparkhistoryserver --field-selector status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+          # Wait for the application to appear in history server
+          for i in {1..30}; do
+            APPS=$(kubectl -n $NAMESPACE exec $POD -- curl -s http://localhost:18080/api/v1/applications)
+            echo "Found applications in history server:"
+            echo $APPS
+            if [ $(echo $APPS | jq length) -gt 0 ]; then
+              echo "Found application in history server"
+              exit 0
+            fi
+            echo "Waiting for application to appear in history server..."
+            sleep 5
+          done
+          echo "Timeout waiting for application in history server"
+          exit 1
+    catch:
+      - script:
+          content: |
+            #!/bin/bash
+            kubectl -n $NAMESPACE describe pods
