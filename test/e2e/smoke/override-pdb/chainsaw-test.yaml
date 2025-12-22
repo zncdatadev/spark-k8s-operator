@@ -87,6 +87,7 @@ spec:
           ./bin/spark-submit \
             --master local[*] \
             --deploy-mode client \
+            --conf spark.driver.host=127.0.0.1 \
             --conf spark.eventLog.enabled=true \
             --conf spark.eventLog.dir=s3a://spark-history/events \
             --conf spark.hadoop.fs.s3a.endpoint=http://minio.$NAMESPACE.svc.cluster.local:9000 \
