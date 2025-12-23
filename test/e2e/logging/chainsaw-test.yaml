@@ -74,3 +74,15 @@ spec:
       - podLogs:
           selector: app.kubernetes.io/instance=sparkhistory
           tail: -1
+      - script:
+          env:
+            - name: NAMESPACE
+              value: ($namespace)
+          content: |
+            POD=$(kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=sparkhistoryserver --field-selector status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+            echo "Printing log4j2.properties from Spark History Server pod $POD"
+            kubectl -n $NAMESPACE exec $POD -- cat /kubedoop/config/log4j2.properties
+            echo "Listing /kubedoop/log/node/ directory contents from Spark History Server pod $POD"
+            kubectl -n $NAMESPACE exec $POD -- ls -alh /kubedoop/log/node/
+            echo "Printing spark.log4j2.xml from Spark History Server pod $POD"
+            kubectl -n $NAMESPACE exec $POD -- cat /kubedoop/log/node/spark.log4j2.xml
