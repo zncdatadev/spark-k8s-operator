@@ -85,4 +85,4 @@ spec:
             echo "Listing /kubedoop/log/node/ directory contents from Spark History Server pod $POD"
             kubectl -n $NAMESPACE exec $POD -- ls -alh /kubedoop/log/node/
             echo "Printing spark.log4j2.xml from Spark History Server pod $POD"
-            kubectl -n $NAMESPACE exec $POD -- cat /kubedoop/log/node/spark.log4j2.xml
+            kubectl -n $NAMESPACE exec $POD -c node -- cat /kubedoop/log/node/spark.log4j2.xml
