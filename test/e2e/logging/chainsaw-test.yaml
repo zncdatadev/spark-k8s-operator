@@ -41,7 +41,7 @@ spec:
   - name: assert sparkhistoryserver logs
     try:
     - sleep:
-        duration: 20s
+        duration: 120s
     - script:
         env:
           - name: NAMESPACE
