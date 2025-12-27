@@ -13,6 +13,4 @@ kind: Service
 metadata:
   name: sparkhistory-node-default
 spec:
-  image:
-    productVersion: (env('PRODUCT_VERSION'))
   type: ClusterIP
