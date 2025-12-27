@@ -23,7 +23,7 @@ spec:
         content: >-
           helm upgrade --install vector-aggregator vector
           --namespace $NAMESPACE
-          --version 0.36.1
+          --version 0.43.0
           --repo https://helm.vector.dev
           --values vector-aggregator-values.yaml
     - apply:
