@@ -11,6 +11,17 @@ spec:
   - name: SPARK_MINIO_BUCKET
     value: spark-history
   steps:
+  # - name: foo
+  #   try:
+  #   - script:
+  #       env:
+  #         - name: product_version
+  #           value: (env('PRODUCT_VERSION'))
+  #       content: echo "product_version is $product_version"
+  #   - apply:
+  #       file: sparkhistoryserver.yaml
+  #   - assert:
+  #       file: sparkhistoryserver-assert.yaml
   - name: install minio
     try:
     - apply:
