@@ -52,23 +52,48 @@ spec:
   - name: assert sparkhistoryserver logs
     try:
     - sleep:
-        duration: 120s
+        duration: 180s
     - script:
         env:
           - name: NAMESPACE
             value: ($namespace)
         content: |
           #!/bin/bash
-          # Get logs from vector-aggregator-0 and check for specific log pattern
-          kubectl -n $NAMESPACE logs statefulset/vector-aggregator -c vector | \
-            grep -q '"cluster":"sparkhistory","container":"node","errors":\[\],"file":"spark.log4j2.xml"'
-          exit_code=$?
+          set -e
 
-          if [ $exit_code -eq 0 ]; then
-            echo "Found expected log pattern"
+          echo "Checking vector-aggregator logs for spark.log4j2.xml pattern..."
+
+          # Retry logic: try up to 6 times with 10 second intervals
+          max_retries=6
+          retry_count=0
+          found=false
+
+          while [ $retry_count -lt $max_retries ]; do
+            echo "Attempt $((retry_count + 1))/$max_retries..."
+
+            # Get logs and check for the pattern
+            if kubectl -n $NAMESPACE logs statefulset/vector-aggregator -c vector 2>/dev/null | \
+               grep -q '"cluster":"sparkhistory","container":"node","errors":\[\],"file":"spark.log4j2.xml"'; then
+              echo "Found expected log pattern!"
+              found=true
+              break
+            fi
+
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+              echo "Pattern not found yet, waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+
+          if [ "$found" = true ]; then
+            echo "✓ Success: Log pattern validation passed"
             exit 0
           else
-            echo "Did not find expected log pattern"
+            echo "✗ Failed: Did not find expected log pattern after $max_retries attempts"
+            echo ""
+            echo "Dumping recent vector-aggregator logs for debugging:"
+            kubectl -n $NAMESPACE logs statefulset/vector-aggregator -c vector --tail=100 2>/dev/null || echo "Failed to get logs"
             exit 1
           fi
     cleanup:
@@ -90,10 +115,54 @@ spec:
             - name: NAMESPACE
               value: ($namespace)
           content: |
+            echo "=========================================="
+            echo "Debug: Spark History Server diagnostics"
+            echo "=========================================="
+
             POD=$(kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=sparkhistoryserver --field-selector status.phase=Running -o jsonpath='{.items[0].metadata.name}')
-            echo "Printing log4j2.properties from Spark History Server pod $POD"
-            kubectl -n $NAMESPACE exec $POD -- cat /kubedoop/config/log4j2.properties
-            echo "Listing /kubedoop/log/node/ directory contents from Spark History Server pod $POD"
-            kubectl -n $NAMESPACE exec $POD -- ls -alh /kubedoop/log/node/
-            echo "Printing spark.log4j2.xml from Spark History Server pod $POD"
-            kubectl -n $NAMESPACE exec $POD -c node -- cat /kubedoop/log/node/spark.log4j2.xml
+
+            if [ -z "$POD" ]; then
+              echo "ERROR: No running Spark History Server pod found"
+              kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=sparkhistoryserver
+              exit 1
+            fi
+
+            echo ""
+            echo "Found pod: $POD"
+            echo ""
+
+            echo "--- 1. Log4j2 Properties Configuration ---"
+            kubectl -n $NAMESPACE exec $POD -c node -- cat /kubedoop/config/log4j2.properties 2>&1 || echo "Failed to read log4j2.properties"
+
+            echo ""
+            echo "--- 2. Log Directory Contents ---"
+            kubectl -n $NAMESPACE exec $POD -c node -- ls -alh /kubedoop/log/node/ 2>&1 || echo "Failed to list log directory"
+
+            echo ""
+            echo "--- 3. Log File Content (spark.log4j2.xml) ---"
+            if kubectl -n $NAMESPACE exec $POD -c node -- test -f /kubedoop/log/node/spark.log4j2.xml 2>/dev/null; then
+              FILE_SIZE=$(kubectl -n $NAMESPACE exec $POD -c node -- stat -c%s /kubedoop/log/node/spark.log4j2.xml 2>/dev/null || echo "unknown")
+              echo "File size: $FILE_SIZE bytes"
+
+              if [ "$FILE_SIZE" = "0" ] || [ "$FILE_SIZE" = "unknown" ]; then
+                echo "WARNING: spark.log4j2.xml is empty or size unknown!"
+                echo "This means Spark History Server hasn't generated any logs yet."
+              else
+                echo "File content (first 50 lines):"
+                kubectl -n $NAMESPACE exec $POD -c node -- head -50 /kubedoop/log/node/spark.log4j2.xml 2>&1
+              fi
+            else
+              echo "ERROR: spark.log4j2.xml does not exist!"
+            fi
+
+            echo ""
+            echo "--- 4. Spark History Server Process Status ---"
+            kubectl -n $NAMESPACE exec $POD -c node -- ps aux 2>&1 | grep -E "(java|spark)" || echo "No Java/Spark processes found"
+
+            echo ""
+            echo "--- 5. Recent Spark History Server Logs (stdout/stderr) ---"
+            echo "Container 'node' logs (last 50 lines):"
+            kubectl -n $NAMESPACE logs $POD -c node --tail=50 2>&1 || echo "Failed to get container logs"
+
+            echo ""
+            echo "=========================================="
