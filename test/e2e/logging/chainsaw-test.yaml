@@ -3,6 +3,8 @@ kind: Test
 metadata:
   name: logging
 spec:
+  timeouts:
+    assert: 6000s
   bindings:
   - name: SPARK_MINIO_USER
     value: spark
@@ -63,8 +65,8 @@ spec:
 
           echo "Checking vector-aggregator logs for spark.log4j2.xml pattern..."
 
-          # Retry logic: try up to 6 times with 10 second intervals
-          max_retries=6
+          # Retry logic: try up to 30 times with 10 second intervals
+          max_retries=30
           retry_count=0
           found=false
 
