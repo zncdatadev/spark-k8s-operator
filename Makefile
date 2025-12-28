@@ -314,7 +314,7 @@ $(CHAINSAW): $(LOCALBIN)
 .PHONY: setup-chainsaw-cluster
 setup-chainsaw-cluster: ## Set up a Kind cluster for e2e tests if it does not exist
 	@command -v $(KIND) >/dev/null 2>&1 || { \
-		echo "Kind is not installed. Please install Kind manually."; \
+		echo "Kind is not installed. Please install Kind manually. You can run `go install sigs.k8s.io/kind@v0.31.0`"; \
 		exit 1; \
 	}
 	@case "$$($(KIND) get clusters)" in \
