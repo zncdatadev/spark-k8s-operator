@@ -19,5 +19,12 @@ spec:
       default:
         replicas: 1
         config:
+          resources:
+            cpu:
+              min: 500m
+              max: 1000m
+            memory:
+              min: 1Gi
+              max: 2Gi
           logging:
             enableVectorAgent: true
