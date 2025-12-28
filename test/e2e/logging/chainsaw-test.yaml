@@ -5,6 +5,7 @@ metadata:
 spec:
   timeouts:
     assert: 6000s
+    exec: 6000s
   bindings:
   - name: SPARK_MINIO_USER
     value: spark
