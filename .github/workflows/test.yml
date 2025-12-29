@@ -51,27 +51,27 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # - name: Create KinD cluster
-      #   env:
-      #     KIND_K8S_VERSION: ${{ matrix.k8s-version}}
-      #     CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
-      #   run: make setup-chainsaw-cluster
+      - name: Create KinD cluster
+        env:
+          KIND_K8S_VERSION: ${{ matrix.k8s-version}}
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make setup-chainsaw-cluster
 
-      # - name: Chainsaw test setup
-      #   env:
-      #     KIND_K8S_VERSION: ${{ matrix.k8s-version }}
-      #     CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
-      #   run: make setup-chainsaw-e2e
+      - name: Chainsaw test setup
+        env:
+          KIND_K8S_VERSION: ${{ matrix.k8s-version }}
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+        run: make setup-chainsaw-e2e
+
+      - name: Test with Chainsaw
+        env:
+          KIND_K8S_VERSION: ${{ matrix.k8s-version }}
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
+          PRODUCT_VERSION: ${{ matrix.product-version }}
+        run: make chainsaw-e2e
 
       # - name: Test with Chainsaw
-      #   env:
-      #     KIND_K8S_VERSION: ${{ matrix.k8s-version }}
-      #     CHAINSAW_KUBECONFIG: kind-kubeconfig-${{ matrix.k8s-version }}
-      #     PRODUCT_VERSION: ${{ matrix.product-version }}
-      #   run: make chainsaw-e2e
-      
-      - name: Test with Chainsaw
-        run: |
-          make setup-chainsaw-cluster
-          make setup-chainsaw-e2e
-          make chainsaw-e2e
+      #   run: |
+      #     make setup-chainsaw-cluster
+      #     make setup-chainsaw-e2e
+      #     make chainsaw-e2e
