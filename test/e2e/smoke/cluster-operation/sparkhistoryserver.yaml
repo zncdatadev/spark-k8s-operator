@@ -4,7 +4,7 @@ metadata:
   name: test-sparkhistoryserver
 spec:
   image:
-    productVersion: ($values.product_version)
+    productVersion: (env('PRODUCT_VERSION'))
   clusterOperation:
     reconciliationPaused: ($cluster_paused)
     stopped: ($cluster_stopped)

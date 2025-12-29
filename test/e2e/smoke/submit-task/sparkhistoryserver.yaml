@@ -1,16 +1,12 @@
 apiVersion: spark.kubedoop.dev/v1alpha1
 kind: SparkHistoryServer
 metadata:
-  name: sparkhistory
+  name: test-sparkhistoryserver
 spec:
   image:
     productVersion: (env('PRODUCT_VERSION'))
   clusterConfig:
     listenerClass: cluster-internal
-    authentication:
-      authenticationClass: oidc
-      oidc:
-        clientCredentialsSecret: oidc-credentials
     logFileDirectory:
       s3:
         prefix: events
@@ -20,10 +16,14 @@ spec:
     roleGroups:
       default:
         replicas: 1
-        # config:
-        #   resources:
-        #     cpu:
-        #       max: 650m
-        #       min: 300m
-        #     memory:
-        #       limit: 800Mi
+        podOverrides:
+          spec:
+            containers:
+              - name: node
+                resources:
+                  requests:
+                    cpu: 200m
+                    memory: 526Mi
+                  limits:
+                    cpu: 250m
+                    memory: 1300Mi

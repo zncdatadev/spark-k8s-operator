@@ -59,8 +59,6 @@ spec:
         file: oidc-authenticationclass.yaml
     - apply:
         file: sparkhistoryserver.yaml
-    - sleep:
-        duration: 100s
     - assert:
         file: sparkhistoryserver-assert.yaml
     cleanup:
