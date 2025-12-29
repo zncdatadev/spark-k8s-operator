@@ -4,7 +4,8 @@ metadata:
   name: sparkhistory
 spec:
   image:
-    productVersion: (env('PRODUCT_VERSION'))
+    # productVersion: (env('PRODUCT_VERSION'))
+    productVersion: 3.5.5-kubedoop0.3.0
   clusterConfig:
     listenerClass: cluster-internal
     logFileDirectory:
@@ -22,8 +23,8 @@ spec:
           resources:
             cpu:
               min: 500m
-              max: 1000m
+              max: 2000m
             memory:
-              limit: 2Gi
+              limit: 4Gi
           logging:
             enableVectorAgent: true
