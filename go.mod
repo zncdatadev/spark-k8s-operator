@@ -3,7 +3,7 @@ module github.com/zncdatadev/spark-k8s-operator
 go 1.25.5
 
 require (
-	github.com/zncdatadev/operator-go v0.12.5
+	github.com/zncdatadev/operator-go v0.12.6
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.35.0
