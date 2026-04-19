@@ -16,14 +16,19 @@ spec:
     roleGroups:
       default:
         replicas: 1
+        # Postmortem note:
+        # - This must stay under roleGroups.default.podOverrides (not under config),
+        #   otherwise the StatefulSet keeps default resources and submit-task can fail.
+        # - submit-task runs spark-submit inside the same HistoryServer container in local[1] mode,
+        #   so HistoryServer JVM + submit JVM overlap; keep enough memory headroom.
         podOverrides:
           spec:
             containers:
               - name: node
                 resources:
                   requests:
-                    cpu: 200m
-                    memory: 526Mi
+                    cpu: 1000m
+                    memory: 3072Mi
                   limits:
-                    cpu: 250m
-                    memory: 1300Mi
+                    cpu: 2000m
+                    memory: 3072Mi
