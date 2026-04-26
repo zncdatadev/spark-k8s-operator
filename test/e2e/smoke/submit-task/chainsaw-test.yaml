@@ -47,16 +47,29 @@ spec:
           export AWS_ACCESS_KEY_ID=\$(cat /kubedoop/secret/s3-credentials/ACCESS_KEY)
           export AWS_SECRET_ACCESS_KEY=\$(cat /kubedoop/secret/s3-credentials/SECRET_KEY)
 
+          # Incident note:
+          # - This test historically failed with exit 137 (OOMKilled) when using PySpark (pi.py)
+          #   because Python + Spark submit + HistoryServer lived in one container.
+          # - local[1] still runs driver/executor in a single JVM, but PySpark adds extra process overhead.
+          # - Use JVM SparkPi and bounded JVM settings for stable CI behavior.
           ./bin/spark-submit \
-            --master local[*] \
+            --master local[1] \
             --deploy-mode client \
             --conf spark.driver.host=127.0.0.1 \
+            --conf spark.driver.memory=512m \
+            --conf spark.driver.memoryOverhead=128m \
+            --conf spark.driver.extraJavaOptions="-XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -XX:MaxDirectMemorySize=48m" \
+            --conf spark.executor.memory=512m \
+            --conf spark.executor.memoryOverhead=128m \
+            --conf spark.executor.extraJavaOptions="-XX:MaxMetaspaceSize=96m -XX:+UseSerialGC -XX:MaxDirectMemorySize=48m" \
+            --conf spark.ui.enabled=false \
             --conf spark.eventLog.enabled=true \
             --conf spark.eventLog.dir=s3a://spark-history/events \
             --conf spark.hadoop.fs.s3a.endpoint=http://minio.$NAMESPACE.svc.cluster.local:9000 \
             --conf spark.hadoop.fs.s3a.path.style.access=true \
             --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
-            examples/src/main/python/pi.py 2
+            --class org.apache.spark.examples.SparkPi \
+            examples/jars/spark-examples_2.12-3.5.5.jar 20
           EOF
           )
 
@@ -69,18 +82,26 @@ spec:
           value: ($namespace)
         content: |
           #!/bin/bash
+          set -x
           POD=$(kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=sparkhistoryserver --field-selector status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+          echo "Using pod: $POD"
           # Wait for the application to appear in history server
-          for i in {1..30}; do
-            APPS=$(kubectl -n $NAMESPACE exec $POD -- curl -s http://localhost:18080/api/v1/applications)
-            echo "Found applications in history server:"
-            echo $APPS
-            if [ $(echo $APPS | jq length) -gt 0 ]; then
+          # spark.history.fs.update.interval defaults to 10s, allow up to 150s total
+          # Incident note:
+          # - chainsaw executes scripts with /usr/bin/sh -c, not bash.
+          # - Do not use brace expansion ({1..30}) or jq-only checks here; keep POSIX sh compatible.
+          i=1
+          while [ "$i" -le 30 ]; do
+            APPS=$(kubectl -n $NAMESPACE exec $POD -- curl -s http://localhost:18080/api/v1/applications 2>/dev/null || echo "[]")
+            echo "Attempt $i/30 - applications response: $APPS"
+            # Check for non-empty array without depending on jq
+            if echo "$APPS" | grep -q '"id"'; then
               echo "Found application in history server"
               exit 0
             fi
             echo "Waiting for application to appear in history server..."
             sleep 5
+            i=$((i + 1))
           done
           echo "Timeout waiting for application in history server"
           exit 1
