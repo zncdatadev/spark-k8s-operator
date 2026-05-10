@@ -232,7 +232,7 @@ func (b *StatefulSetBuilder) getOidcContainer(ctx context.Context) (*corev1.Cont
 	}
 
 	issuer := url.URL{
-		Scheme: "http",
+		Scheme: defaultScheme,
 		Host:   oidcProvider.Hostname,
 		Path:   oidcProvider.RootPath,
 	}
@@ -259,7 +259,7 @@ func (b *StatefulSetBuilder) getOidcContainer(ctx context.Context) (*corev1.Cont
 	var sparkHistoryPorts int32
 
 	for _, port := range b.Ports {
-		if port.Name == "http" {
+		if port.Name == util.HttpPortName {
 			sparkHistoryPorts = port.ContainerPort
 			break
 		}

@@ -68,7 +68,7 @@ func GetInlineS3Bucket(ctx context.Context, client *client.Client, s3Bucket *v1a
 	}
 
 	endpoint := url.URL{
-		Scheme: "http",
+		Scheme: defaultScheme,
 		Host:   s3ConnectionSpec.Host,
 	}
 	if s3ConnectionSpec.Port != 0 {
