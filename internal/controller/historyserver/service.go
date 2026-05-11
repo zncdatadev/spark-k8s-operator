@@ -32,7 +32,7 @@ func NewRoleGroupMetricsService(
 	// Create service name with -metrics suffix
 	serviceName := util.GetMetricsServiceName(roleGroupInfo)
 
-	scheme := "http"
+	scheme := defaultScheme
 	// Prepare labels (copy from roleGroupInfo and add metrics labels)
 	labels := make(map[string]string)
 	for k, v := range roleGroupInfo.GetLabels() {

@@ -1,5 +1,6 @@
 package historyserver
 
 const (
-	trueValue = "true"
+	trueValue     = "true"
+	defaultScheme = "http"
 )
