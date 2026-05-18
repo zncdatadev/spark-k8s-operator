@@ -44,6 +44,9 @@ cover.out
 .codiumai.toml
 .omc
 
+# ai codin
+.omc
+
 # helm charts
 # helm package directory
 target
