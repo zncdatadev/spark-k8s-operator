@@ -119,5 +119,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Create KinD cluster
+        env:
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-chart-e2e
+        run: make setup-chainsaw-cluster
+
       - name: Run chart-e2e
+        env:
+          CHAINSAW_KUBECONFIG: kind-kubeconfig-chart-e2e
         run: make chart-e2e
