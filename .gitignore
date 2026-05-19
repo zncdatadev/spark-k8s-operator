@@ -50,3 +50,4 @@ cover.out
 # helm charts
 # helm package directory
 target
+.worktree/
