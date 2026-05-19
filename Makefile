@@ -350,11 +350,11 @@ chart-e2e: ## Run chart e2e tests (deploy via Helm, then run chainsaw)
 	@echo "Installing operator dependencies..."
 	@if [ -n "$(strip $(OPERATOR_DEPENDS))" ]; then \
 		for dep in $(OPERATOR_DEPENDS); do \
-			"$(HELM)" upgrade --install --create-namespace --namespace kubedoop-operators --wait $$dep oci://quay.io/kubedoopcharts/$$dep --version $$(VERSION); \
+			"$(HELM)" upgrade --install --create-namespace --namespace kubedoop-operators --wait $$dep oci://quay.io/kubedoopcharts/$$dep --version $(VERSION); \
 		done; \
 	fi
 	@echo "Installing spark-k8s-operator chart..."
-	"$(HELM)" upgrade --install --create-namespace --namespace spark-k8s-operator --wait spark-k8s-operator ./target/charts/spark-k8s-operator-$$(VERSION).tgz
+	"$(HELM)" upgrade --install --create-namespace --namespace spark-k8s-operator --wait spark-k8s-operator ./target/charts/spark-k8s-operator-$(VERSION).tgz
 	@echo "Running chainsaw e2e tests..."
 	$(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/
 
