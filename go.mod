@@ -1,6 +1,6 @@
 module github.com/zncdatadev/spark-k8s-operator
 
-go 1.25.5
+go 1.25.8
 
 require (
 	github.com/zncdatadev/operator-go v0.12.6
