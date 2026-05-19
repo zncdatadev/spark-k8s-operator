@@ -37,6 +37,8 @@ spec:
         bindings:
         - name: NAMESPACE
           value: ($namespace)
+        - name: SPARK_VERSION
+          value: (env('PRODUCT_VERSION'))
         content: |
           #!/bin/bash
           set -x
@@ -69,7 +71,7 @@ spec:
             --conf spark.hadoop.fs.s3a.path.style.access=true \
             --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
             --class org.apache.spark.examples.SparkPi \
-            examples/jars/spark-examples_2.12-3.5.5.jar 20
+            examples/jars/spark-examples_2.12-${SPARK_VERSION}.jar 20
           EOF
           )
 
