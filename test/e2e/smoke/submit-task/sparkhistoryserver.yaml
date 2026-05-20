@@ -4,7 +4,7 @@ metadata:
   name: test-sparkhistoryserver
 spec:
   image:
-    productVersion: ($values.product_version)
+    productVersion: (env('PRODUCT_VERSION'))
   clusterConfig:
     listenerClass: cluster-internal
     logFileDirectory:
