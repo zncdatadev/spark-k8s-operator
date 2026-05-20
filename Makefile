@@ -341,7 +341,7 @@ setup-chainsaw-e2e: chainsaw docker-build ## Run the chainsaw setup
 
 .PHONY: chainsaw-e2e
 chainsaw-e2e: ## Run the chainsaw e2e tests
-	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/
+	echo "product_version: $(PRODUCT_VERSION)" | KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --values -
 
 .PHONY: chart-e2e
 chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package ## Run chart e2e tests (deploy via Helm, then run chainsaw)
@@ -349,7 +349,7 @@ chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package ## Ru
 	@echo "Installing spark-k8s-operator chart..."
 	"$(HELM)" upgrade --install --create-namespace --namespace spark-k8s-operator --kubeconfig $(CHAINSAW_KUBECONFIG) --wait spark-k8s-operator ./target/charts/spark-k8s-operator-$(VERSION).tgz
 	@echo "Running chainsaw e2e tests..."
-	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/
+	echo "product_version: $(PRODUCT_VERSION)" | KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --values -
 
 .PHONY: cleanup-chainsaw-e2e
 cleanup-chainsaw-e2e: ## Run the chainsaw cleanup
