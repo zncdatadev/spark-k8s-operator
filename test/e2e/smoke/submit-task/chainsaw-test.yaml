@@ -69,7 +69,7 @@ spec:
             --conf spark.hadoop.fs.s3a.path.style.access=true \
             --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \
             --class org.apache.spark.examples.SparkPi \
-            examples/jars/spark-examples_2.12-3.5.5.jar 20
+            examples/jars/spark-examples_2.12-*.jar 20
           EOF
           )
 

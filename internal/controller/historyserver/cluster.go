@@ -42,7 +42,12 @@ func (r *ClusterReconciler) GetImage() *util.Image {
 	image := util.NewImage(
 		shsv1alpha1.DefaultProductName,
 		version.BuildVersion,
-		shsv1alpha1.DefaultProductVersion,
+		func() string {
+			if r.Spec.Image.ProductVersion != "" {
+				return r.Spec.Image.ProductVersion
+			}
+			return shsv1alpha1.DefaultProductVersion
+		}(),
 		func(options *util.ImageOptions) {
 			options.Custom = r.Spec.Image.Custom
 			options.Repo = r.Spec.Image.Repo

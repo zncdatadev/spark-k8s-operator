@@ -4,8 +4,7 @@ metadata:
   name: sparkhistory
 spec:
   image:
-    # productVersion: (env('PRODUCT_VERSION'))
-    productVersion: 3.5.5-kubedoop0.3.0
+    productVersion: 3.5.5
   clusterConfig:
     listenerClass: cluster-internal
     logFileDirectory:
