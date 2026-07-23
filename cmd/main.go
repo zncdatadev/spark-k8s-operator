@@ -28,6 +28,7 @@ import (
 
 	authv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/authentication/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -193,10 +194,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&historyserver.SparkHistoryServerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	sparkHandler := historyserver.NewSparkHistoryRoleGroupHandler(mgr.GetScheme())
+	sparkReconciler, err := reconciler.NewGenericReconciler(
+		&reconciler.GenericReconcilerConfig[*sparkv1alpha1.SparkHistoryServer]{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			//nolint:staticcheck // TODO: migrate to GetEventRecorder once the SDK supports it
+			Recorder:         mgr.GetEventRecorderFor("sparkhistoryserver-controller"),
+			RoleGroupHandler: sparkHandler,
+			// Per-CR ServiceAccount: a shared, fixed-name SA breaks namespaces hosting
+			// multiple clusters.
+			ServiceAccountNameFunc: func(cr *sparkv1alpha1.SparkHistoryServer) string {
+				return sparkv1alpha1.DefaultProductName + "-" + cr.GetName()
+			},
+			Prototype: &sparkv1alpha1.SparkHistoryServer{},
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to create reconciler", "controller", "SparkHistoryServer")
+		os.Exit(1)
+	}
+	if err = sparkReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SparkHistoryServer")
 		os.Exit(1)
 	}

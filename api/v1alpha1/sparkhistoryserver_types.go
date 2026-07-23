@@ -19,15 +19,20 @@ package v1alpha1
 import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/status"
+	"github.com/zncdatadev/operator-go/pkg/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
 	DefaultRepository     = "quay.io/zncdatadev"
 	DefaultProductVersion = "3.5.5"
 	DefaultProductName    = "spark-k8s"
+
+	// RoleNode is the sole role of the Spark history server cluster. The name is contract:
+	// it is the workload container name and the "-node-" segment of every resource name.
+	RoleNode = "node"
 )
 
 // https://book.kubebuilder.io/reference/generating-crd
@@ -40,8 +45,8 @@ type SparkHistoryServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
-	Status status.Status          `json:"status,omitempty"`
+	Spec   SparkHistoryServerSpec   `json:"spec,omitempty"`
+	Status SparkHistoryServerStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -181,9 +186,135 @@ type RoleGroupSpec struct {
 	Config *ConfigSpec `json:"config,omitempty"`
 }
 
-type PodOverridesSpec struct {
+// SparkHistoryServerStatus defines the observed state of SparkHistoryServer
+type SparkHistoryServerStatus struct {
+	commonsv1alpha1.GenericClusterStatus `json:",inline"`
 }
+
+// ClusterInterface implementation
+
+// GetSpec adapts the product spec to the framework's generic cluster spec.
+func (s *SparkHistoryServer) GetSpec() *commonsv1alpha1.GenericClusterSpec {
+	return s.Spec.ToGenericSpec()
+}
+
+// GetStatus returns the cluster status.
+func (s *SparkHistoryServer) GetStatus() *commonsv1alpha1.GenericClusterStatus {
+	return &s.Status.GenericClusterStatus
+}
+
+// SetStatus updates the cluster status.
+func (s *SparkHistoryServer) SetStatus(status *commonsv1alpha1.GenericClusterStatus) {
+	s.Status.GenericClusterStatus = *status
+}
+
+// GetObjectMeta returns the object metadata.
+func (s *SparkHistoryServer) GetObjectMeta() *metav1.ObjectMeta {
+	return &s.ObjectMeta
+}
+
+// GetScheme returns the cached runtime scheme.
+func (s *SparkHistoryServer) GetScheme() *runtime.Scheme {
+	return cachedScheme
+}
+
+// DeepCopyCluster creates a deep copy of the cluster.
+func (s *SparkHistoryServer) DeepCopyCluster() common.ClusterInterface {
+	return s.DeepCopy()
+}
+
+// GetRuntimeObject returns the underlying runtime.Object.
+func (s *SparkHistoryServer) GetRuntimeObject() runtime.Object {
+	return s
+}
+
+// VectorAggregatorConfigMapName implements reconciler.VectorAggregatorProvider so the framework
+// owns vector.yaml generation: when a role group enables the Vector agent, the GenericReconciler
+// resolves the aggregator address from this ConfigMap and renders vector.yaml into the role group
+// ConfigMap. Returns "" when unset (the framework then omits vector.yaml).
+func (s *SparkHistoryServer) VectorAggregatorConfigMapName() string {
+	if s.Spec.ClusterConfig == nil {
+		return ""
+	}
+	return s.Spec.ClusterConfig.VectorAggregatorConfigMapName
+}
+
+// ToGenericSpec adapts SparkHistoryServerSpec to GenericClusterSpec.
+func (s *SparkHistoryServerSpec) ToGenericSpec() *commonsv1alpha1.GenericClusterSpec {
+	result := &commonsv1alpha1.GenericClusterSpec{
+		ClusterOperation: s.ClusterOperation,
+	}
+
+	if s.Image != nil {
+		result.Image = &commonsv1alpha1.ImageSpec{
+			Custom:          s.Image.Custom,
+			Repo:            s.Image.Repo,
+			ProductVersion:  s.Image.ProductVersion,
+			KubedoopVersion: s.Image.KubedoopVersion,
+			PullPolicy:      s.Image.PullPolicy,
+		}
+	}
+
+	if s.Node != nil {
+		result.Roles = map[string]commonsv1alpha1.RoleSpec{
+			RoleNode: s.Node.toGenericRole(),
+		}
+	}
+
+	return result
+}
+
+// toGenericRole adapts the typed node role to the commons role spec.
+func (r *RoleSpec) toGenericRole() commonsv1alpha1.RoleSpec {
+	roleSpec := commonsv1alpha1.RoleSpec{
+		RoleConfig: r.RoleConfig,
+	}
+
+	if r.Config != nil {
+		roleSpec.Config = r.Config.RoleGroupConfigSpec
+	}
+
+	if r.OverridesSpec != nil {
+		roleSpec.ConfigOverrides = r.ConfigOverrides
+		roleSpec.EnvOverrides = r.EnvOverrides
+		roleSpec.CliOverrides = r.CliOverrides
+		roleSpec.PodOverrides = r.PodOverrides
+	}
+
+	roleGroups := make(map[string]commonsv1alpha1.RoleGroupSpec)
+	for name, rg := range r.RoleGroups {
+		if rg == nil {
+			continue
+		}
+		roleGroups[name] = rg.toGenericRoleGroup()
+	}
+	roleSpec.RoleGroups = roleGroups
+
+	return roleSpec
+}
+
+// toGenericRoleGroup adapts a typed role group to the commons role group spec.
+func (rg *RoleGroupSpec) toGenericRoleGroup() commonsv1alpha1.RoleGroupSpec {
+	adapted := commonsv1alpha1.RoleGroupSpec{
+		Replicas: rg.Replicas,
+	}
+	if rg.Config != nil {
+		adapted.Config = rg.Config.RoleGroupConfigSpec
+	}
+	if rg.OverridesSpec != nil {
+		adapted.ConfigOverrides = rg.ConfigOverrides
+		adapted.EnvOverrides = rg.EnvOverrides
+		adapted.CliOverrides = rg.CliOverrides
+		adapted.PodOverrides = rg.PodOverrides
+	}
+	return adapted
+}
+
+// cachedScheme is initialized once and reused across all reconcile calls.
+var cachedScheme *runtime.Scheme
 
 func init() {
 	SchemeBuilder.Register(&SparkHistoryServer{}, &SparkHistoryServerList{})
+	cachedScheme = runtime.NewScheme()
+	_ = SchemeBuilder.AddToScheme(cachedScheme)
 }

@@ -1,212 +1,79 @@
+/*
+Copyright 2023 zncdatadev.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package historyserver
 
 import (
 	"context"
-	"net/url"
-	"path"
-	"strconv"
-	"strings"
+	"fmt"
 
-	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/client"
-	"github.com/zncdatadev/operator-go/pkg/constants"
-	"github.com/zncdatadev/operator-go/pkg/util"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/zncdatadev/operator-go/pkg/s3"
+	"github.com/zncdatadev/operator-go/pkg/security"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
 )
 
-const (
-	S3AccessKeyName = "ACCESS_KEY"
-	S3SecretKeyName = "SECRET_KEY"
-
-	S3VolumeName = "s3-credentials"
-)
-
-// TODO: Add the tls verification
-type S3BucketConnect struct {
-	Endpoint   url.URL
-	Bucket     string
-	Region     string
-	PathStyle  bool
-	credential *commonsv1alpha1.Credentials
+// S3LogConfig is the resolved S3 event-log location: the bucket (with its connection facts
+// and credentials) plus the CR's log prefix.
+type S3LogConfig struct {
+	Bucket *s3.BucketInfo
+	Prefix string
 }
 
-func GetS3BucketConnect(ctx context.Context, client *client.Client, s3 *shsv1alpha1.BucketSpec) (*S3BucketConnect, error) {
-	if s3.Inline != nil {
-		return GetInlineS3Bucket(ctx, client, s3.Inline)
+// resolveS3LogConfig resolves spec.clusterConfig.logFileDirectory.s3 (required by the CRD)
+// through the operator-go S3 resolver.
+func resolveS3LogConfig(ctx context.Context, client ctrlclient.Client, namespace string, s3Spec *shsv1alpha1.S3Spec) (*S3LogConfig, error) {
+	if s3Spec == nil || s3Spec.Bucket == nil {
+		return nil, fmt.Errorf("spec.clusterConfig.logFileDirectory.s3.bucket is required")
 	}
-
-	if s3.Reference != "" {
-		return GetReferenceS3Bucket(ctx, client, s3.Reference)
-	}
-
-	return nil, nil
-}
-
-func GetReferenceS3Bucket(ctx context.Context, client *client.Client, name string) (*S3BucketConnect, error) {
-	s3Bucket := &v1alpha1.S3Bucket{}
-	if err := client.GetWithOwnerNamespace(ctx, name, s3Bucket); err != nil {
-		return nil, err
-	}
-
-	return GetInlineS3Bucket(ctx, client, &s3Bucket.Spec)
-}
-
-func GetInlineS3Bucket(ctx context.Context, client *client.Client, s3Bucket *v1alpha1.S3BucketSpec) (*S3BucketConnect, error) {
-	refConnection := s3Bucket.Connection.Reference
-	s3ConnectionSpec := s3Bucket.Connection.Inline
-	if refConnection != "" {
-		s3Connection, err := GetRefreenceS3Connection(ctx, client, refConnection)
-		if err != nil {
-			return nil, err
-		}
-		s3ConnectionSpec = &s3Connection.Spec
-	}
-
-	endpoint := url.URL{
-		Scheme: defaultScheme,
-		Host:   s3ConnectionSpec.Host,
-	}
-	if s3ConnectionSpec.Port != 0 {
-		endpoint.Host += ":" + strconv.Itoa(s3ConnectionSpec.Port)
-	}
-
-	return &S3BucketConnect{
-		Endpoint:   endpoint,
-		Bucket:     s3Bucket.BucketName,
-		Region:     "us-west-1",
-		PathStyle:  s3ConnectionSpec.PathStyle,
-		credential: s3ConnectionSpec.Credentials,
-	}, nil
-}
-
-func GetRefreenceS3Connection(ctx context.Context, client *client.Client, name string) (*v1alpha1.S3Connection, error) {
-	s3Connection := &v1alpha1.S3Connection{}
-	if err := client.GetWithOwnerNamespace(ctx, name, s3Connection); err != nil {
-		return nil, err
-	}
-	return s3Connection, nil
-}
-
-type S3Logconfig struct {
-	S3BucketConnect *S3BucketConnect
-	LogPath         string
-}
-
-func NewS3Logconfig(
-	ctx context.Context,
-	client *client.Client,
-	s3 *shsv1alpha1.S3Spec,
-) (*S3Logconfig, error) {
-	s3BucketConnect, err := GetS3BucketConnect(ctx, client, s3.Bucket)
+	bucket, err := s3.ResolveBucket(ctx, client, namespace, s3Spec.Bucket.Inline, s3Spec.Bucket.Reference)
 	if err != nil {
 		return nil, err
 	}
-
-	return &S3Logconfig{
-		S3BucketConnect: s3BucketConnect,
-		LogPath:         s3.Prefix,
-	}, nil
+	return &S3LogConfig{Bucket: bucket, Prefix: s3Spec.Prefix}, nil
 }
 
-func (s *S3Logconfig) GetMountPath() string {
-	return path.Join(constants.KubedoopSecretDir, S3VolumeName)
-}
-
-func (s *S3Logconfig) GetVolumeName() string {
-	return S3VolumeName
-}
-
-func (s *S3Logconfig) GetLogDirectory() string {
-	s3path := url.URL{
-		Scheme: "s3a",
-		Host:   s.S3BucketConnect.Bucket,
-		Path:   s.LogPath,
+// SparkDefaults renders the S3-driven spark-defaults.conf properties: the event-log
+// directory plus the s3a client settings, prefixed with "spark.hadoop." as Spark requires.
+func (c *S3LogConfig) SparkDefaults() map[string]string {
+	props := map[string]string{
+		"spark.history.fs.logDirectory": c.Bucket.S3AURI(c.Prefix),
 	}
-	return s3path.String()
+	for key, value := range c.Bucket.S3AProperties() {
+		props["spark.hadoop."+key] = value
+	}
+	// Path-style access is intentionally always on: most self-hosted S3 backends (MinIO)
+	// require it, and the CRD's pathStyle default (false) predates any consumer of the
+	// virtual-host style — flipping it must be coordinated with the e2e fixtures.
+	props["spark.hadoop.fs.s3a.path.style.access"] = trueValue
+	return props
 }
 
-func (s *S3Logconfig) GetEndpoint() string {
-	return s.S3BucketConnect.Endpoint.String()
+// CredentialsProvisioner returns the CSI credentials volume provisioner (mounted at
+// /kubedoop/secret/s3-credentials, the e2e-asserted path), or nil for anonymous access.
+func (c *S3LogConfig) CredentialsProvisioner() *security.SecretProvisioner {
+	return c.Bucket.CredentialsProvisioner(s3.DefaultCredentialsVolumeName)
 }
 
-func (s *S3Logconfig) GetPartialProperties() map[string]string {
-
-	sslEnabled := s.S3BucketConnect.Endpoint.Scheme == "https"
-
-	properties := map[string]string{
-		"spark.history.fs.logDirectory":              s.GetLogDirectory(),
-		"spark.hadoop.fs.s3a.endpoint":               s.GetEndpoint(),
-		"spark.hadoop.fs.s3a.path.style.access":      trueValue,
-		"spark.hadoop.fs.s3a.connection.ssl.enabled": strconv.FormatBool(sslEnabled),
+// CredentialsExportScript returns the shell fragment exporting the mounted credentials as
+// AWS SDK env vars, or "" for anonymous access.
+func (c *S3LogConfig) CredentialsExportScript() string {
+	if c.Bucket.Credentials == nil {
+		return ""
 	}
-	return properties
-}
-
-func (s *S3Logconfig) GetVolume() *corev1.Volume {
-
-	credential := s.S3BucketConnect.credential
-
-	secretClass := credential.SecretClass
-
-	annotations := map[string]string{
-		constants.AnnotationSecretsClass: secretClass,
-	}
-
-	if credential.Scope != nil {
-		scopes := []string{}
-		if credential.Scope.Node {
-			scopes = append(scopes, string(constants.NodeScope))
-		}
-		if credential.Scope.Pod {
-			scopes = append(scopes, string(constants.PodScope))
-		}
-		scopes = append(scopes, credential.Scope.Services...)
-
-		annotations[constants.AnnotationSecretsScope] = strings.Join(scopes, constants.CommonDelimiter)
-	}
-	secretVolume := &corev1.Volume{
-		Name: s.GetVolumeName(),
-		VolumeSource: corev1.VolumeSource{
-			Ephemeral: &corev1.EphemeralVolumeSource{
-				VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
-					ObjectMeta: metav1.ObjectMeta{
-						Annotations: annotations,
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						StorageClassName: constants.SecretStorageClassPtr(),
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Mi"),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	return secretVolume
-}
-
-func (s *S3Logconfig) GetVolumeMount() *corev1.VolumeMount {
-	secretVolumeMount := &corev1.VolumeMount{
-		Name:      s.GetVolumeName(),
-		MountPath: s.GetMountPath(),
-	}
-
-	return secretVolumeMount
-}
-
-func (s *S3Logconfig) GetPartialCmdArgs() string {
-	args := `
-export AWS_ACCESS_KEY_ID=$(cat ` + path.Join(s.GetMountPath(), S3AccessKeyName) + `)
-export AWS_SECRET_ACCESS_KEY=$(cat ` + path.Join(s.GetMountPath(), S3SecretKeyName) + `)
-`
-
-	return util.IndentTab4Spaces(args)
+	return s3.CredentialsExportScript(s3.CredentialsMountPath(s3.DefaultCredentialsVolumeName))
 }
