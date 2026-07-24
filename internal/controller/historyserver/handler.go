@@ -123,8 +123,11 @@ func (h *SparkHistoryRoleGroupHandler) BuildResources(
 	}
 
 	// Resolve the CR-driven image before delegating to the framework: the base BuildResources
-	// propagates it to the StatefulSet and the registered sidecars (Vector).
+	// propagates it to the StatefulSet and the registered sidecars (Vector). Both fields are
+	// assigned unconditionally — the handler is a singleton across CRs, so a CR omitting
+	// pullPolicy must not inherit the previous CR's value.
 	h.Image = resolveImage(cr.Spec.Image)
+	h.ImagePullPolicy = corev1.PullIfNotPresent
 	if cr.Spec.Image != nil && cr.Spec.Image.PullPolicy != "" {
 		h.ImagePullPolicy = cr.Spec.Image.PullPolicy
 	}
@@ -199,7 +202,8 @@ func (h *SparkHistoryRoleGroupHandler) customizeStatefulSet(resources *reconcile
 		}
 		main := &containers[i]
 
-		main.Command = []string{"/bin/bash", "-x", "-euo", "pipefail", "-c"}
+		// No -x: xtrace would echo the expanded AWS credential exports into the container log.
+		main.Command = []string{"/bin/bash", "-euo", "pipefail", "-c"}
 		main.Args = []string{h.mainContainerScript(s3LogConfig)}
 
 		// Product defaults first, framework-applied envOverrides last so overrides win.
