@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/onsi/ginkgo/v2 v2.28.3
 	github.com/onsi/gomega v1.40.0
-	github.com/zncdatadev/operator-go v0.12.7-0.20260719140021-b43bc0c5ff17
+	github.com/zncdatadev/operator-go v0.12.7-0.20260725090642-baa62fd6fde4
 	k8s.io/api v0.35.4
 	k8s.io/apimachinery v0.35.4
 	k8s.io/client-go v0.35.4
@@ -102,5 +102,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2-0.20260122202528-d9cc6641c482 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-replace github.com/zncdatadev/operator-go => ../../../operator-go
