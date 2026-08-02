@@ -1,0 +1,104 @@
+/*
+Copyright 2024 ZNCDataDev.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package vector
+
+import (
+	"github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/constant"
+)
+
+// IsAgentEnabled reports whether the Vector agent is enabled for the given (already
+// deep-merged) logging spec. It is the single, nil-safe source of truth shared by the
+// producer side (the role-group base handler that creates the shared log volume and gates
+// the file appender) and the consumer side (the sidecar-manager registration in the generic
+// reconciler). Keeping one predicate guarantees the two sides can never drift.
+func IsAgentEnabled(logging *v1alpha1.LoggingSpec) bool {
+	return logging != nil && logging.EnableVectorAgent != nil && *logging.EnableVectorAgent
+}
+
+const (
+	// VectorSidecarName is the name of the Vector sidecar container.
+	VectorSidecarName = "vector"
+
+	// VectorConfigVolumeName is the name of the Vector config volume.
+	VectorConfigVolumeName = "vector-config"
+
+	// VectorConfigMountPath is the mount path for Vector config.
+	VectorConfigMountPath = "/etc/vector"
+
+	// VectorDataVolumeName is the name of the Vector data volume.
+	VectorDataVolumeName = "vector-data"
+
+	// VectorDataMountPath is the mount path for Vector data. It must match the data_dir in
+	// the generated vector.yaml (the stable pipeline uses /kubedoop/vector/var), otherwise
+	// Vector would persist its checkpoints on the read-only root filesystem and fail.
+	VectorDataMountPath = "/kubedoop/vector/var"
+
+	// VectorDataVolumeSize is the default size for the Vector data volume.
+	VectorDataVolumeSize = "50Mi"
+
+	// VectorLogVolumeName is the canonical name of the shared log volume. The Vector provider
+	// creates this emptyDir, RW-mounts it on each declared producer container, and mounts it
+	// on the Vector sidecar as well — read-write there too, because the sidecar (a native init
+	// container that starts before the producers) pre-creates each producer's per-container
+	// log directory ("<LogDir>/<container>") before exec'ing vector.
+	VectorLogVolumeName = "log"
+
+	// VectorLogMountPath is the mount path for the shared log volume on the Vector container.
+	// It is the framework-canonical log directory so the consumer reads exactly where the
+	// producer (and product file appenders) write. Kept as a package-local alias of
+	// constant.KubedoopLogDir to avoid an import cycle-free indirection at call sites.
+	VectorLogMountPath = constant.KubedoopLogDir
+
+	// DefaultLogVolumeSize is the default SizeLimit for the shared log emptyDir created by
+	// the producer (the role-group base handler). It bounds on-node disk usage for rolling
+	// log files that the Vector sidecar consumes. The bound also protects the node from a
+	// runaway log producer filling the ephemeral filesystem. It is overridable per role
+	// group (see BaseRoleGroupHandler.LogVolumeSize). 33Mi mirrors the rolling-appender
+	// budget zk historically used (a few small rolled files) and stays comfortably small.
+	DefaultLogVolumeSize = "33Mi"
+
+	// VectorDefaultConfigMapName is the default ConfigMap name for Vector config.
+	VectorDefaultConfigMapName = "vector-config"
+
+	// VectorAPIPort is the port the Vector API listens on (see vectorConfigTemplate for the address
+	// it binds and the security question that address raises). It is deliberately not declared as a
+	// container port, and nothing in the framework calls the API.
+	VectorAPIPort = 8686
+
+	// VectorHealthEndpoint is the health endpoint of the Vector API. The container's liveness probe
+	// deliberately does NOT use it: it reports that the API server is up, not that the pipeline is
+	// running, so the prometheus_exporter endpoint below is the stronger signal.
+	VectorHealthEndpoint = "/health"
+
+	// VectorMetricsPort is the port the rendered pipeline's prometheus_exporter sink listens on
+	// (Vector's own default for that sink). Two things depend on it being reachable: scraping the
+	// agent, and the container's liveness probe. Unlike the API it carries only the agent's internal
+	// metrics — component throughput, error counters, buffer depth — and no log content.
+	VectorMetricsPort = 9598
+
+	// VectorMetricsPortName names the metrics container port. Container port names must be unique
+	// across the whole Pod, so this cannot be the bare "metrics" the JMX exporter sidecar already
+	// uses (and which a product's own container is likely to use too).
+	VectorMetricsPortName = "vector-metrics"
+
+	// VectorMetricsPath is the path a prometheus_exporter sink serves; Vector hardcodes it.
+	VectorMetricsPath = "/metrics"
+
+	// VectorConfigFileName is the name of the Vector configuration file.
+	VectorConfigFileName = "vector.yaml"
+)

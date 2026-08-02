@@ -1,0 +1,662 @@
+/*
+Copyright 2024 ZNCDataDev.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package productlogging
+
+import (
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+// boundedFileDefaults applies sensible defaults to the rolling-file bounds so a generated
+// file appender can never grow without limit (total usage <= maxFileSize * (maxHistory + 1)).
+// Takes raw fields (rather than an options struct) so both RenderOptions and LogbackOptions
+// callers can share it.
+func boundedFileDefaults(maxFileSize string, maxHistory int) (string, int) {
+	if maxFileSize == "" {
+		maxFileSize = "5MB"
+	}
+	if maxHistory <= 0 {
+		maxHistory = 1
+	}
+	return maxFileSize, maxHistory
+}
+
+// parseSizeBytes converts a size string like "5MB" / "512KB" / "1024" into bytes, returning
+// fallback when it cannot be parsed. Used where a numeric byte count is required (Python).
+func parseSizeBytes(s string, fallback int64) int64 {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	mult := int64(1)
+	switch {
+	case strings.HasSuffix(s, "KB"):
+		mult, s = 1024, strings.TrimSuffix(s, "KB")
+	case strings.HasSuffix(s, "MB"):
+		mult, s = 1024*1024, strings.TrimSuffix(s, "MB")
+	case strings.HasSuffix(s, "GB"):
+		mult, s = 1024*1024*1024, strings.TrimSuffix(s, "GB")
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n * mult
+}
+
+// escapeXML escapes the five XML special characters so caller-supplied strings (logger
+// names, patterns, file paths) cannot produce invalid logback XML.
+func escapeXML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&apos;")
+	return s
+}
+
+// propertyKeyEscaper / propertyValueEscaper implement the java.util.Properties escaping the
+// generated log4j and log4j2 files are read back with (both configurators call Properties.load).
+// Logger names arrive as CRD map keys and are therefore unconstrained: an unescaped separator or
+// space would end the key early and turn the rest of the line into the value, and a line break
+// or a trailing backslash would splice entries together.
+var (
+	propertyKeyEscaper = strings.NewReplacer(
+		`\`, `\\`, "=", `\=`, ":", `\:`, " ", `\ `, "\t", `\t`, "\n", `\n`, "\r", `\r`)
+	propertyValueEscaper = strings.NewReplacer(
+		`\`, `\\`, "\t", `\t`, "\n", `\n`, "\r", `\r`)
+)
+
+// escapePropertyKey escapes a string used as (part of) a properties key.
+func escapePropertyKey(s string) string {
+	return propertyKeyEscaper.Replace(s)
+}
+
+// escapePropertyValue escapes a string used as a properties value. Only the value's leading
+// space needs escaping (a reader strips the padding after the separator); interior spaces stay
+// readable, which is what conversion patterns are made of.
+func escapePropertyValue(s string) string {
+	s = propertyValueEscaper.Replace(s)
+	if strings.HasPrefix(s, " ") {
+		return `\` + s
+	}
+	return s
+}
+
+// LogLevel defines the logging level.
+type LogLevel string
+
+const (
+	LogLevelTrace LogLevel = "TRACE"
+	LogLevelDebug LogLevel = "DEBUG"
+	LogLevelInfo  LogLevel = "INFO"
+	LogLevelWarn  LogLevel = "WARN"
+	LogLevelError LogLevel = "ERROR"
+	LogLevelFatal LogLevel = "FATAL"
+)
+
+// LoggerConfig defines configuration for a single logger.
+type LoggerConfig struct {
+	Name  string   `json:"name"`
+	Level LogLevel `json:"level"`
+}
+
+// LoggingGenerator generates logging configuration files.
+type LoggingGenerator struct {
+	framework LoggingFramework
+}
+
+// NewLoggingGenerator creates a new LoggingGenerator.
+func NewLoggingGenerator(framework LoggingFramework) *LoggingGenerator {
+	return &LoggingGenerator{
+		framework: framework,
+	}
+}
+
+// Generate generates the logging configuration content based on the configured framework.
+func (g *LoggingGenerator) Generate(configs map[string]LoggerConfig) (string, error) {
+	gen, err := GeneratorFor(g.framework)
+	if err != nil {
+		return "", err
+	}
+	return gen.Render(LogConfig{Loggers: loggerConfigsToLevels(configs)}, RenderOptions{})
+}
+
+// GenerateLog4j generates Log4j 1.x properties format (as consumed by log4j 1.2 / reload4j).
+// The output format is:
+// log4j.rootLogger=INFO, CONSOLE
+// log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+// log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+// log4j.appender.CONSOLE.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n
+// log4j.logger.com.example=DEBUG
+func GenerateLog4j(configs map[string]LoggerConfig) (string, error) {
+	return renderLog4j(LogConfig{Loggers: loggerConfigsToLevels(configs)}, RenderOptions{})
+}
+
+// GenerateLog4j2 generates Log4j2 properties format.
+// The output format is:
+// rootLogger.level=INFO
+// rootLogger.appenderRefs=stdout
+// rootLogger.appenderRef.stdout.ref=STDOUT
+// appenders=console
+// appender.console.type=Console
+// appender.console.name=STDOUT
+// appender.console.layout.type=PatternLayout
+// appender.console.layout.pattern=%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n
+// loggers=com_example,org_apache
+// logger.com_example.name=com.example
+// logger.com_example.level=DEBUG
+func GenerateLog4j2(configs map[string]LoggerConfig) (string, error) {
+	return renderLog4j2(LogConfig{Loggers: loggerConfigsToLevels(configs)}, RenderOptions{})
+}
+
+// GenerateLogback generates Logback XML format.
+// The output format is:
+// <configuration>
+//
+//	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+//	  <encoder>
+//	    <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+//	  </encoder>
+//	</appender>
+//	<root level="INFO">
+//	  <appender-ref ref="STDOUT" />
+//	</root>
+//	<logger name="com.example" level="DEBUG" />
+//
+// </configuration>
+func GenerateLogback(configs map[string]LoggerConfig) (string, error) {
+	return GenerateLogbackWithOptions(configs, LogbackOptions{})
+}
+
+// LogbackOptions tunes logback generation. The zero value reproduces the console-only
+// output of GenerateLogback.
+type LogbackOptions struct {
+	// FileOutputPath, when set, adds a bounded RollingFileAppender writing to this path in
+	// addition to the console appender. The file appender emits log4j-compatible XMLLayout
+	// events, so the path must match the Vector "files_log4j" glob
+	// ("<LogDir>*/*.log4j.xml") — pass "<LogDir>/<lowercased container>/<container>.log4j.xml"
+	// (see ContainerLogDir / ContainerLogFileName). Without this, log aggregation has nothing
+	// to read.
+	FileOutputPath string
+
+	// Pattern overrides the console encoder pattern. The FILE appender always uses the
+	// log4j-compatible XMLLayout (machine-parsed by Vector), so the pattern does not apply
+	// to it.
+	Pattern string
+
+	// RootLevel overrides the level of the root logger. Defaults to INFO when empty.
+	RootLevel LogLevel
+
+	// ConsoleLevel, when set, adds a ThresholdFilter to the console (STDOUT) appender so
+	// messages below this level are dropped. Empty means no threshold.
+	ConsoleLevel LogLevel
+
+	// FileLevel, when set, adds a ThresholdFilter to the rolling file appender. Only
+	// applies when FileOutputPath is set. Empty means no threshold.
+	FileLevel LogLevel
+
+	// MaxFileSize / MaxHistory bound the rolling file appender so it cannot exhaust the log
+	// volume (total usage <= MaxFileSize * (MaxHistory + 1)). Sensible defaults are applied
+	// when left zero. TotalSizeCap is retained for API compatibility but unused: the stable
+	// FixedWindowRollingPolicy is already bounded by the other two knobs.
+	MaxFileSize  string
+	MaxHistory   int
+	TotalSizeCap string
+}
+
+// GenerateLogbackWithOptions generates logback XML with optional file output.
+func GenerateLogbackWithOptions(configs map[string]LoggerConfig, opts LogbackOptions) (string, error) {
+	pattern := opts.Pattern
+	if pattern == "" {
+		pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n"
+	}
+	// Escape the (possibly caller-supplied) pattern so reserved XML characters cannot
+	// produce invalid logback XML.
+	pattern = escapeXML(pattern)
+
+	var sb strings.Builder
+	sb.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration>\n")
+	fmt.Fprintf(&sb, `  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+%s    <encoder>
+      <pattern>%s</pattern>
+    </encoder>
+  </appender>
+`, logbackThresholdFilter(opts.ConsoleLevel), pattern)
+
+	hasFile := opts.FileOutputPath != ""
+	if hasFile {
+		// The stable (v0.12.6) FILE appender: log4j-compatible XMLLayout (the Vector files_log4j
+		// source edge-parses "<log4j:event>" records) with a bounded FixedWindowRollingPolicy
+		// ("<file>.%i" backups). Total disk usage is bounded by maxFileSize * (maxIndex + 1),
+		// so TotalSizeCap does not apply here.
+		maxFileSize, maxHistory := boundedFileDefaults(opts.MaxFileSize, opts.MaxHistory)
+		fmt.Fprintf(&sb, `
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>%s</file>
+%s    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+      <layout class="ch.qos.logback.classic.log4j.XMLLayout" />
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <minIndex>1</minIndex>
+      <maxIndex>%d</maxIndex>
+      <fileNamePattern>%s.%%i</fileNamePattern>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <maxFileSize>%s</maxFileSize>
+    </triggeringPolicy>
+  </appender>
+`, escapeXML(opts.FileOutputPath), logbackThresholdFilter(opts.FileLevel), maxHistory, escapeXML(opts.FileOutputPath), maxFileSize)
+	}
+
+	rootLevel := opts.RootLevel
+	if rootLevel == "" {
+		rootLevel = LogLevelInfo
+	}
+	fmt.Fprintf(&sb, "\n  <root level=\"%s\">\n    <appender-ref ref=\"STDOUT\" />\n", escapeXML(string(rootLevel)))
+	if hasFile {
+		sb.WriteString("    <appender-ref ref=\"FILE\" />\n")
+	}
+	sb.WriteString("  </root>\n")
+
+	if len(configs) == 0 {
+		sb.WriteString("</configuration>\n")
+		return sb.String(), nil
+	}
+
+	// Sort logger names for deterministic output
+	names := make([]string, 0, len(configs))
+	for name := range configs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	// Logger configurations
+	for _, name := range names {
+		config := configs[name]
+		fmt.Fprintf(&sb, "  <logger name=\"%s\" level=\"%s\" />\n", escapeXML(name), escapeXML(string(config.Level)))
+	}
+
+	sb.WriteString("</configuration>\n")
+	return sb.String(), nil
+}
+
+// GeneratePythonLogging generates Python logging config.
+// The output format is:
+//
+//	LOGGING = {
+//	    'version': 1,
+//	    'disable_existing_loggers': False,
+//	    'formatters': {...},
+//	    'handlers': {...},
+//	    'loggers': {...},
+//	    'root': {...}
+//	}
+func GeneratePythonLogging(configs map[string]LoggerConfig) (string, error) {
+	return renderPython(LogConfig{Loggers: loggerConfigsToLevels(configs)}, RenderOptions{})
+}
+
+// escapeLoggerName turns a logger name into a property identifier: log4j2 addresses each logger
+// as "logger.<id>.*", so the id has to be a bare key segment. Anything outside [A-Za-z0-9_]
+// (a dot or dash, but also a space, separator or line break a CRD map key may carry) would split
+// the key or comment the line out, so it becomes '_'.
+func escapeLoggerName(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '_':
+			return r
+		default:
+			return '_'
+		}
+	}, s)
+}
+
+// log4j2LoggerIDs maps logger names (in the caller's order) to their property identifiers.
+// Sanitizing collapses distinct names onto the same id ("com.example" and "com-example"), which
+// would leave the second name overwriting the first's "logger.<id>.name" and one of the two
+// loggers unconfigured, so a collision is broken with a numeric suffix.
+func log4j2LoggerIDs(names []string) []string {
+	ids := make([]string, 0, len(names))
+	taken := make(map[string]bool, len(names))
+	for _, name := range names {
+		id := escapeLoggerName(name)
+		if id == "" {
+			// An empty name would produce "logger..name"; keep the key well-formed.
+			id = "logger"
+		}
+		unique := id
+		for i := 2; taken[unique]; i++ {
+			unique = id + "_" + strconv.Itoa(i)
+		}
+		taken[unique] = true
+		ids = append(ids, unique)
+	}
+	return ids
+}
+
+// toPythonLogLevel converts a LogLevel to Python logging level.
+func toPythonLogLevel(level LogLevel) string {
+	switch level {
+	case LogLevelTrace:
+		return string(LogLevelDebug) // Python doesn't have TRACE, map to DEBUG
+	case LogLevelDebug:
+		return string(LogLevelDebug)
+	case LogLevelInfo:
+		return "INFO"
+	case LogLevelWarn:
+		return "WARNING"
+	case LogLevelError:
+		return "ERROR"
+	case LogLevelFatal:
+		return "CRITICAL"
+	default:
+		return "INFO"
+	}
+}
+
+// pythonQuote renders s as a single-quoted Python string literal. The generated dictConfig is a
+// Python module, so a logger name (an unconstrained CRD map key) carrying a quote, a backslash
+// or a line break would end the literal and make the whole module a SyntaxError — the product
+// would then start with no logging configuration at all.
+func pythonQuote(s string) string {
+	var sb strings.Builder
+	sb.WriteByte('\'')
+	for _, r := range s {
+		switch r {
+		case '\\':
+			sb.WriteString(`\\`)
+		case '\'':
+			sb.WriteString(`\'`)
+		case '\n':
+			sb.WriteString(`\n`)
+		case '\r':
+			sb.WriteString(`\r`)
+		case '\t':
+			sb.WriteString(`\t`)
+		default:
+			sb.WriteRune(r)
+		}
+	}
+	sb.WriteByte('\'')
+	return sb.String()
+}
+
+// loggerConfigsToLevels adapts the legacy LoggerConfig map to a plain name->level map.
+func loggerConfigsToLevels(configs map[string]LoggerConfig) map[string]LogLevel {
+	if len(configs) == 0 {
+		return nil
+	}
+	out := make(map[string]LogLevel, len(configs))
+	for name, c := range configs {
+		out[name] = c.Level
+	}
+	return out
+}
+
+// sortedLoggerNames returns the logger names in deterministic (sorted) order.
+func sortedLoggerNames(loggers map[string]LogLevel) []string {
+	names := make([]string, 0, len(loggers))
+	for name := range loggers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// logbackThresholdFilter renders a logback ThresholdFilter element (indented to sit inside
+// an <appender>), or an empty string when no threshold is requested.
+func logbackThresholdFilter(level LogLevel) string {
+	if level == "" {
+		return ""
+	}
+	return fmt.Sprintf("    <filter class=\"ch.qos.logback.classic.filter.ThresholdFilter\">\n      <level>%s</level>\n    </filter>\n", escapeXML(string(level)))
+}
+
+// renderLogback renders logback XML from the framework-neutral model.
+func renderLogback(cfg LogConfig, opts RenderOptions) (string, error) {
+	return GenerateLogbackWithOptions(loggersToLoggerConfigs(cfg.Loggers), LogbackOptions{
+		Pattern:        opts.Pattern,
+		RootLevel:      cfg.RootLevel,
+		ConsoleLevel:   cfg.ConsoleLevel,
+		FileLevel:      cfg.FileLevel,
+		FileOutputPath: opts.FileOutputPath,
+		MaxFileSize:    opts.MaxFileSize,
+		MaxHistory:     opts.MaxHistory,
+		TotalSizeCap:   opts.TotalSizeCap,
+	})
+}
+
+// renderLog4j renders log4j 1.x properties (log4j 1.2 / reload4j) from the framework-neutral
+// model. When opts.FileOutputPath is set it adds a bounded RollingFileAppender wired to the
+// root logger. The console appender uses a plain-text PatternLayout; the FILE appender uses
+// the stable org.apache.log4j.xml.XMLLayout so the file output matches the Vector
+// "files_log4j" edge parser (see LogFileSuffix). Patterns are emitted verbatim: '%' has no
+// special meaning in log4j properties values, so conversion patterns like "[%d] %p %m (%c)%n"
+// need no escaping.
+func renderLog4j(cfg LogConfig, opts RenderOptions) (string, error) {
+	pattern := opts.Pattern
+	if pattern == "" {
+		pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n"
+	}
+	rootLevel := cfg.RootLevel
+	if rootLevel == "" {
+		rootLevel = LogLevelInfo
+	}
+	hasFile := opts.FileOutputPath != ""
+
+	var sb strings.Builder
+	sb.WriteString("# Log4j Configuration\n")
+	if hasFile {
+		fmt.Fprintf(&sb, "log4j.rootLogger=%s, CONSOLE, FILE\n\n", escapePropertyValue(string(rootLevel)))
+	} else {
+		fmt.Fprintf(&sb, "log4j.rootLogger=%s, CONSOLE\n\n", escapePropertyValue(string(rootLevel)))
+	}
+
+	sb.WriteString("# Appenders\n")
+	sb.WriteString("log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender\n")
+	if cfg.ConsoleLevel != "" {
+		fmt.Fprintf(&sb, "log4j.appender.CONSOLE.Threshold=%s\n", escapePropertyValue(string(cfg.ConsoleLevel)))
+	}
+	sb.WriteString("log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout\n")
+	fmt.Fprintf(&sb, "log4j.appender.CONSOLE.layout.ConversionPattern=%s\n", escapePropertyValue(pattern))
+
+	if hasFile {
+		// Bounded rollover (MaxFileSize + MaxBackupIndex) so the file cannot grow without limit.
+		// The stable (v0.12.6) layout is org.apache.log4j.xml.XMLLayout: Vector's files_log4j
+		// source multiline-assembles the "<log4j:event>" records and edge-parses them.
+		maxFileSize, maxHistory := boundedFileDefaults(opts.MaxFileSize, opts.MaxHistory)
+		sb.WriteString("\nlog4j.appender.FILE=org.apache.log4j.RollingFileAppender\n")
+		if cfg.FileLevel != "" {
+			fmt.Fprintf(&sb, "log4j.appender.FILE.Threshold=%s\n", escapePropertyValue(string(cfg.FileLevel)))
+		}
+		fmt.Fprintf(&sb, "log4j.appender.FILE.File=%s\n", escapePropertyValue(opts.FileOutputPath))
+		fmt.Fprintf(&sb, "log4j.appender.FILE.MaxFileSize=%s\n", maxFileSize)
+		fmt.Fprintf(&sb, "log4j.appender.FILE.MaxBackupIndex=%d\n", maxHistory)
+		sb.WriteString("log4j.appender.FILE.layout=org.apache.log4j.xml.XMLLayout\n")
+	}
+
+	if len(cfg.Loggers) == 0 {
+		return sb.String(), nil
+	}
+	sb.WriteString("\n# Loggers\n")
+	// The logger name is part of the property KEY here, so it carries properties key escaping;
+	// PropertyConfigurator unescapes it back to the CRD's name.
+	for _, name := range sortedLoggerNames(cfg.Loggers) {
+		fmt.Fprintf(&sb, "log4j.logger.%s=%s\n", escapePropertyKey(name), escapePropertyValue(string(cfg.Loggers[name])))
+	}
+	return sb.String(), nil
+}
+
+// renderLog4j2 renders log4j2 properties from the framework-neutral model. When
+// opts.FileOutputPath is set it adds a rolling file appender wired to the root logger.
+func renderLog4j2(cfg LogConfig, opts RenderOptions) (string, error) {
+	pattern := opts.Pattern
+	if pattern == "" {
+		pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n"
+	}
+	rootLevel := cfg.RootLevel
+	if rootLevel == "" {
+		rootLevel = LogLevelInfo
+	}
+	hasFile := opts.FileOutputPath != ""
+
+	var sb strings.Builder
+	sb.WriteString("# Log4j2 Configuration\n")
+	fmt.Fprintf(&sb, "rootLogger.level=%s\n", escapePropertyValue(string(rootLevel)))
+	// The appenderRefs line only declares reference identifiers; each identifier MUST be bound
+	// to an appender name via "rootLogger.appenderRef.<id>.ref=<AppenderName>", otherwise the
+	// root logger ends up with no appenders at all (no console output, empty log file).
+	if hasFile {
+		sb.WriteString("rootLogger.appenderRefs=stdout,file\n")
+		sb.WriteString("rootLogger.appenderRef.stdout.ref=STDOUT\n")
+		sb.WriteString("rootLogger.appenderRef.file.ref=FILE\n\n")
+	} else {
+		sb.WriteString("rootLogger.appenderRefs=stdout\n")
+		sb.WriteString("rootLogger.appenderRef.stdout.ref=STDOUT\n\n")
+	}
+
+	sb.WriteString("# Appenders\n")
+	if hasFile {
+		sb.WriteString("appenders=console,file\n")
+	} else {
+		sb.WriteString("appenders=console\n")
+	}
+	sb.WriteString("appender.console.type=Console\n")
+	sb.WriteString("appender.console.name=STDOUT\n")
+	sb.WriteString("appender.console.layout.type=PatternLayout\n")
+	fmt.Fprintf(&sb, "appender.console.layout.pattern=%s\n", escapePropertyValue(pattern))
+	if cfg.ConsoleLevel != "" {
+		sb.WriteString("appender.console.filter.threshold.type=ThresholdFilter\n")
+		fmt.Fprintf(&sb, "appender.console.filter.threshold.level=%s\n", escapePropertyValue(string(cfg.ConsoleLevel)))
+	}
+	sb.WriteString("\n")
+	if hasFile {
+		// The stable (v0.12.6) FILE appender: log4j2 XMLLayout ("<Event>" records edge-parsed by
+		// Vector's files_log4j2 source) with the plain "<file>.%i" rollover pattern.
+		maxFileSize, maxHistory := boundedFileDefaults(opts.MaxFileSize, opts.MaxHistory)
+		sb.WriteString("appender.file.type=RollingFile\n")
+		sb.WriteString("appender.file.name=FILE\n")
+		fmt.Fprintf(&sb, "appender.file.fileName=%s\n", escapePropertyValue(opts.FileOutputPath))
+		fmt.Fprintf(&sb, "appender.file.filePattern=%s.%%i\n", escapePropertyValue(opts.FileOutputPath))
+		sb.WriteString("appender.file.layout.type=XMLLayout\n")
+		if cfg.FileLevel != "" {
+			sb.WriteString("appender.file.filter.threshold.type=ThresholdFilter\n")
+			fmt.Fprintf(&sb, "appender.file.filter.threshold.level=%s\n", escapePropertyValue(string(cfg.FileLevel)))
+		}
+		// Bounded rollover so the file cannot grow without limit.
+		sb.WriteString("appender.file.policies.type=Policies\n")
+		sb.WriteString("appender.file.policies.size.type=SizeBasedTriggeringPolicy\n")
+		fmt.Fprintf(&sb, "appender.file.policies.size.size=%s\n", maxFileSize)
+		sb.WriteString("appender.file.strategy.type=DefaultRolloverStrategy\n")
+		fmt.Fprintf(&sb, "appender.file.strategy.max=%d\n", maxHistory)
+		sb.WriteString("\n")
+	}
+
+	if len(cfg.Loggers) == 0 {
+		return sb.String(), nil
+	}
+	names := sortedLoggerNames(cfg.Loggers)
+	// The "loggers" list names the property identifiers, not the logger names: each entry must
+	// be the same id the "logger.<id>.*" keys below use, otherwise a property parser that reads
+	// the list (log4j2 < 2.6) finds no matching keys and drops every configured logger.
+	ids := log4j2LoggerIDs(names)
+	sb.WriteString("# Loggers\n")
+	sb.WriteString("loggers=")
+	sb.WriteString(strings.Join(ids, ","))
+	sb.WriteString("\n\n")
+	// The name is a value, not part of the key, so it keeps its original spelling (properties
+	// value escaping only neutralizes what would end the line).
+	for i, name := range names {
+		safeName := ids[i]
+		fmt.Fprintf(&sb, "logger.%s.name=%s\n", safeName, escapePropertyValue(name))
+		fmt.Fprintf(&sb, "logger.%s.level=%s\n\n", safeName, escapePropertyValue(string(cfg.Loggers[name])))
+	}
+	return sb.String(), nil
+}
+
+// renderPython renders a Python logging.config dictConfig from the framework-neutral model.
+// When opts.FileOutputPath is set it adds a rotating file handler wired to the root logger,
+// writing one JSON object per line with the keys the Vector "files_py" edge parser expects
+// (asctime / name / levelname / message; see processed_files_py in pkg/vector). v0.12.6 had
+// no python generator, so this matches the vector template's files_py contract directly.
+// The JSON is produced by a plain %-format string: a message containing JSON-special
+// characters (quotes, backslashes) yields an unparsable line, which the Vector transform
+// degrades gracefully (raw line kept as .message plus a .errors entry).
+func renderPython(cfg LogConfig, opts RenderOptions) (string, error) {
+	rootLevel := toPythonLogLevel(cfg.RootLevel)
+	consoleLevel := string(LogLevelDebug)
+	if cfg.ConsoleLevel != "" {
+		consoleLevel = toPythonLogLevel(cfg.ConsoleLevel)
+	}
+	hasFile := opts.FileOutputPath != ""
+
+	var sb strings.Builder
+	sb.WriteString("# Python Logging Configuration\n")
+	sb.WriteString("LOGGING = {\n")
+	sb.WriteString("    'version': 1,\n")
+	sb.WriteString("    'disable_existing_loggers': False,\n")
+	sb.WriteString("    'formatters': {\n")
+	sb.WriteString("        'standard': {\n")
+	sb.WriteString("            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'\n")
+	sb.WriteString("        },\n")
+	if hasFile {
+		sb.WriteString("        'json': {\n")
+		sb.WriteString(`            'format': '{"asctime": "%(asctime)s", "name": "%(name)s", "levelname": "%(levelname)s", "message": "%(message)s"}'` + "\n")
+		sb.WriteString("        },\n")
+	}
+	sb.WriteString("    },\n")
+	sb.WriteString("    'handlers': {\n")
+	sb.WriteString("        'console': {\n")
+	fmt.Fprintf(&sb, "            'level': '%s',\n", consoleLevel)
+	sb.WriteString("            'class': 'logging.StreamHandler',\n")
+	sb.WriteString("            'formatter': 'standard',\n")
+	sb.WriteString("        },\n")
+	if hasFile {
+		fileLevel := string(LogLevelDebug)
+		if cfg.FileLevel != "" {
+			fileLevel = toPythonLogLevel(cfg.FileLevel)
+		}
+		maxFileSize, maxHistory := boundedFileDefaults(opts.MaxFileSize, opts.MaxHistory)
+		maxBytes := parseSizeBytes(maxFileSize, 5*1024*1024)
+		sb.WriteString("        'file': {\n")
+		fmt.Fprintf(&sb, "            'level': '%s',\n", fileLevel)
+		sb.WriteString("            'class': 'logging.handlers.RotatingFileHandler',\n")
+		fmt.Fprintf(&sb, "            'filename': %s,\n", pythonQuote(opts.FileOutputPath))
+		// Bound the file so rotation is actually enabled (maxBytes=0 would disable it).
+		fmt.Fprintf(&sb, "            'maxBytes': %d,\n", maxBytes)
+		fmt.Fprintf(&sb, "            'backupCount': %d,\n", maxHistory)
+		sb.WriteString("            'formatter': 'json',\n")
+		sb.WriteString("        },\n")
+	}
+	sb.WriteString("    },\n")
+	sb.WriteString("    'loggers': {\n")
+	rootHandlers := "['console']"
+	if hasFile {
+		rootHandlers = "['console', 'file']"
+	}
+	// A named logger only carries its level: it propagates to the root logger, which owns the
+	// handlers. Attaching the root handlers here as well would emit every record twice (once
+	// per handler on the logger, once more after propagation).
+	for _, name := range sortedLoggerNames(cfg.Loggers) {
+		fmt.Fprintf(&sb, "        %s: {\n", pythonQuote(name))
+		fmt.Fprintf(&sb, "            'level': '%s',\n", toPythonLogLevel(cfg.Loggers[name]))
+		sb.WriteString("            'propagate': True,\n")
+		sb.WriteString("        },\n")
+	}
+	sb.WriteString("    },\n")
+	fmt.Fprintf(&sb, "    'root': {\n        'level': '%s',\n        'handlers': %s,\n    },\n}\n", rootLevel, rootHandlers)
+	return sb.String(), nil
+}

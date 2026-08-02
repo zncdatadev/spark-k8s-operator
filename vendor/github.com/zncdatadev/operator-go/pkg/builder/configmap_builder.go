@@ -1,0 +1,146 @@
+/*
+Copyright 2024 ZNCDataDev.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package builder
+
+import (
+	"fmt"
+	"maps"
+	"slices"
+
+	"github.com/zncdatadev/operator-go/pkg/config"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+// ConfigMapBuilder constructs ConfigMap resources.
+type ConfigMapBuilder struct {
+	Name        string
+	Namespace   string
+	Labels      map[string]string
+	Annotations map[string]string
+	Data        map[string]string
+	BinaryData  map[string][]byte
+}
+
+// NewConfigMapBuilder creates a new ConfigMapBuilder.
+func NewConfigMapBuilder(name, namespace string) *ConfigMapBuilder {
+	return &ConfigMapBuilder{
+		Name:        name,
+		Namespace:   namespace,
+		Labels:      make(map[string]string),
+		Annotations: make(map[string]string),
+		Data:        make(map[string]string),
+		BinaryData:  make(map[string][]byte),
+	}
+}
+
+// WithLabels sets the labels.
+func (b *ConfigMapBuilder) WithLabels(labels map[string]string) *ConfigMapBuilder {
+	for k, v := range labels {
+		b.Labels[k] = v
+	}
+	return b
+}
+
+// WithAnnotations sets the annotations.
+func (b *ConfigMapBuilder) WithAnnotations(annotations map[string]string) *ConfigMapBuilder {
+	for k, v := range annotations {
+		b.Annotations[k] = v
+	}
+	return b
+}
+
+// AddData adds a key-value pair to the data section.
+func (b *ConfigMapBuilder) AddData(key, value string) *ConfigMapBuilder {
+	b.Data[key] = value
+	return b
+}
+
+// AddBinaryData adds a key-value pair to the binary data section.
+func (b *ConfigMapBuilder) AddBinaryData(key string, value []byte) *ConfigMapBuilder {
+	b.BinaryData[key] = value
+	return b
+}
+
+// WithConfigFiles sets the data from a config file map.
+func (b *ConfigMapBuilder) WithConfigFiles(files map[string]string) *ConfigMapBuilder {
+	for filename, content := range files {
+		b.Data[filename] = content
+	}
+	return b
+}
+
+// WithMergedConfig sets the data from a MergedConfig using the provided generator.
+// Returns an error if config generation fails to prevent creating ConfigMaps with incomplete data.
+//
+// The generator only ever emits, so a format registered with Marshal alone (a
+// config.ConfigMarshaler that is not a config.ConfigUnmarshaler) works here. A failure carries
+// the generator's message, which names the offending file and format, under the ConfigMap the
+// caller was building.
+func (b *ConfigMapBuilder) WithMergedConfig(cfg *config.MergedConfig, generator *config.MultiFormatConfigGenerator) (*ConfigMapBuilder, error) {
+	if cfg == nil || generator == nil {
+		return b, nil
+	}
+
+	files, err := generator.GenerateFiles(cfg.ConfigFiles)
+	if err != nil {
+		return b, fmt.Errorf("failed to generate config files for ConfigMap %s/%s: %w", b.Namespace, b.Name, err)
+	}
+
+	for filename, content := range files {
+		b.Data[filename] = content
+	}
+
+	return b, nil
+}
+
+// Build creates the ConfigMap. Like the other builders, the returned object shares no map with
+// the builder, so mutating it (or building twice) cannot corrupt the builder's state.
+func (b *ConfigMapBuilder) Build() *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        b.Name,
+			Namespace:   b.Namespace,
+			Labels:      maps.Clone(b.Labels),
+			Annotations: maps.Clone(b.Annotations),
+		},
+	}
+
+	if len(b.Data) > 0 {
+		cm.Data = maps.Clone(b.Data)
+	}
+
+	if len(b.BinaryData) > 0 {
+		// maps.Clone would copy the map but keep every []byte backing array shared with the
+		// builder, so a caller writing into a built entry would reach back into the builder.
+		cm.BinaryData = make(map[string][]byte, len(b.BinaryData))
+		for key, value := range b.BinaryData {
+			cm.BinaryData[key] = slices.Clone(value)
+		}
+	}
+
+	return cm
+}
+
+// NamespacedName returns the NamespacedName for the ConfigMap.
+func (b *ConfigMapBuilder) NamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Name:      b.Name,
+		Namespace: b.Namespace,
+	}
+}
