@@ -19,10 +19,8 @@ package v1alpha1
 import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -162,6 +160,19 @@ type RoleSpec struct {
 	// +kubebuilder:validation:Optional
 	Config *ConfigSpec `json:"config,omitempty"`
 
+	// RoleGroups defines the role group configurations. Each role group maps to one
+	// StatefulSet.
+	//
+	// The name constraint mirrors commons.RoleSpec.RoleGroups, which this typed field
+	// replaces and whose CEL guard therefore does not reach this CRD: a role group name is a
+	// segment of "<cluster>-node-<group>" and the value of the app.kubernetes.io/role-group
+	// label, so a name that is not a lowercase RFC 1123 label yields resource names the API
+	// server refuses — mid-reconcile, instead of at apply. MaxProperties bounds the CEL cost
+	// estimate, not the deployment.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxProperties=256
+	// +kubebuilder:validation:XValidation:rule=`self.all(k, size(k) <= 63 && k.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))`,message=`each role group name must be a lowercase RFC 1123 label (lowercase alphanumerics and '-', starting and ending with an alphanumeric, at most 63 characters): role group names become part of the name and labels of every resource built for the group`
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -191,7 +202,8 @@ type SparkHistoryServerStatus struct {
 	commonsv1alpha1.GenericClusterStatus `json:",inline"`
 }
 
-// ClusterInterface implementation
+// ClusterInterface implementation (client.Object + GetSpec + GetStatus; status is mutated
+// through the pointer GetStatus returns)
 
 // GetSpec adapts the product spec to the framework's generic cluster spec.
 func (s *SparkHistoryServer) GetSpec() *commonsv1alpha1.GenericClusterSpec {
@@ -201,31 +213,6 @@ func (s *SparkHistoryServer) GetSpec() *commonsv1alpha1.GenericClusterSpec {
 // GetStatus returns the cluster status.
 func (s *SparkHistoryServer) GetStatus() *commonsv1alpha1.GenericClusterStatus {
 	return &s.Status.GenericClusterStatus
-}
-
-// SetStatus updates the cluster status.
-func (s *SparkHistoryServer) SetStatus(status *commonsv1alpha1.GenericClusterStatus) {
-	s.Status.GenericClusterStatus = *status
-}
-
-// GetObjectMeta returns the object metadata.
-func (s *SparkHistoryServer) GetObjectMeta() *metav1.ObjectMeta {
-	return &s.ObjectMeta
-}
-
-// GetScheme returns the cached runtime scheme.
-func (s *SparkHistoryServer) GetScheme() *runtime.Scheme {
-	return cachedScheme
-}
-
-// DeepCopyCluster creates a deep copy of the cluster.
-func (s *SparkHistoryServer) DeepCopyCluster() common.ClusterInterface {
-	return s.DeepCopy()
-}
-
-// GetRuntimeObject returns the underlying runtime.Object.
-func (s *SparkHistoryServer) GetRuntimeObject() runtime.Object {
-	return s
 }
 
 // VectorAggregatorConfigMapName implements reconciler.VectorAggregatorProvider so the framework
@@ -310,11 +297,6 @@ func (rg *RoleGroupSpec) toGenericRoleGroup() commonsv1alpha1.RoleGroupSpec {
 	return adapted
 }
 
-// cachedScheme is initialized once and reused across all reconcile calls.
-var cachedScheme *runtime.Scheme
-
 func init() {
 	SchemeBuilder.Register(&SparkHistoryServer{}, &SparkHistoryServerList{})
-	cachedScheme = runtime.NewScheme()
-	_ = SchemeBuilder.AddToScheme(cachedScheme)
 }

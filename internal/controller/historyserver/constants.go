@@ -17,6 +17,9 @@ limitations under the License.
 package historyserver
 
 const (
+	// AppName is the app.kubernetes.io/name label value; the e2e scripts select pods by it.
+	AppName = "sparkhistoryserver"
+
 	// HTTP is the history server UI/REST port; its name and number are e2e contract.
 	HttpPortName = "http"
 	HttpPort     = 18080

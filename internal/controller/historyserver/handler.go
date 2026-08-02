@@ -27,6 +27,7 @@ import (
 	"github.com/zncdatadev/operator-go/pkg/constant"
 	"github.com/zncdatadev/operator-go/pkg/productlogging"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
+	"github.com/zncdatadev/operator-go/pkg/sidecar"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -58,7 +59,6 @@ func NewSparkHistoryRoleGroupHandler(scheme *runtime.Scheme) *SparkHistoryRoleGr
 	// The container name must match the per-container logging key (logging.containers.node)
 	// and is asserted by the e2e suites.
 	base.MainContainerName = shsv1alpha1.RoleNode
-	base.ExtraLabels["app.kubernetes.io/name"] = "sparkhistoryserver"
 
 	// Declarative logging: the framework renders the log4j2 config into the ConfigMap as
 	// "log4j2.properties" (in-container /kubedoop/config/log4j2.properties) with the rolling
@@ -122,6 +122,14 @@ func (h *SparkHistoryRoleGroupHandler) BuildResources(
 		return nil, fmt.Errorf("spec.clusterConfig.logFileDirectory is required")
 	}
 
+	// The e2e-contracted app label. The framework emits app.kubernetes.io/name only for
+	// handlers that set ProductName — which spark cannot: ProductName also drives CR-image
+	// resolution as "{repo}/{ProductName}", and spark's image product ("spark-k8s") differs
+	// from its app name. Injecting via ClusterLabels (metadata + pod template, never
+	// selectors) is the sanctioned channel — same pattern as zookeeper-operator. The
+	// framework guarantees the map is non-nil.
+	buildCtx.ClusterLabels[constant.LabelKubernetesName] = AppName
+
 	// Resolve the CR-driven image before delegating to the framework: the base BuildResources
 	// propagates it to the StatefulSet and the registered sidecars (Vector). Both fields are
 	// assigned unconditionally — the handler is a singleton across CRs, so a CR omitting
@@ -160,7 +168,11 @@ func (h *SparkHistoryRoleGroupHandler) BuildResources(
 		return nil, err
 	}
 	if oidcProvider != nil {
-		registerOIDCSidecar(buildCtx.SidecarManager, oidcProvider, clusterConfig.Authentication.Oidc, string(cr.GetUID()))
+		cookieSecretRef, err := ensureCookieSecret(ctx, k8sClient, cr, h.Scheme)
+		if err != nil {
+			return nil, err
+		}
+		registerOIDCSidecar(buildCtx.SidecarManager, oidcProvider, clusterConfig.Authentication.Oidc, cookieSecretRef)
 	}
 
 	resources, err := h.BaseRoleGroupHandler.BuildResources(ctx, k8sClient, cr, buildCtx)
@@ -195,34 +207,33 @@ func (h *SparkHistoryRoleGroupHandler) customizeStatefulSet(resources *reconcile
 		return
 	}
 
-	containers := sts.Spec.Template.Spec.Containers
-	for i := range containers {
-		if containers[i].Name != shsv1alpha1.RoleNode {
-			continue
-		}
-		main := &containers[i]
-
-		// No -x: xtrace would echo the expanded AWS credential exports into the container log.
-		main.Command = []string{"/bin/bash", "-euo", "pipefail", "-c"}
-		main.Args = []string{h.mainContainerScript(s3LogConfig)}
-
-		// Product defaults first, framework-applied envOverrides last so overrides win.
-		main.Env = append(h.mainContainerEnv(), main.Env...)
-
-		probe := func() *corev1.Probe {
-			return &corev1.Probe{
-				ProbeHandler: corev1.ProbeHandler{
-					TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromString(HttpPortName)},
-				},
-				InitialDelaySeconds: 10,
-				TimeoutSeconds:      5,
-				PeriodSeconds:       10,
-			}
-		}
-		main.ReadinessProbe = probe()
-		main.LivenessProbe = probe()
-		break
+	main := sidecar.FindContainer(&sts.Spec.Template.Spec, shsv1alpha1.RoleNode)
+	if main == nil {
+		return
 	}
+
+	// No -x: xtrace would echo the expanded AWS credential exports into the container log.
+	main.Command = []string{"/bin/bash", "-euo", "pipefail", "-c"}
+	main.Args = []string{h.mainContainerScript(s3LogConfig)}
+
+	// Product defaults first, framework-applied envOverrides last so overrides win.
+	main.Env = append(h.mainContainerEnv(), main.Env...)
+
+	probe := func() *corev1.Probe {
+		return &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromString(HttpPortName)},
+			},
+			InitialDelaySeconds: 10,
+			TimeoutSeconds:      5,
+			PeriodSeconds:       10,
+		}
+	}
+	// The framework generates a readiness probe on the first port but deliberately no longer
+	// guesses a liveness probe, so both stay explicit here: the history server serves both
+	// checks on its HTTP port.
+	main.ReadinessProbe = probe()
+	main.LivenessProbe = probe()
 }
 
 // customizeService maps the CRD listenerClass onto the client Service type and exposes the

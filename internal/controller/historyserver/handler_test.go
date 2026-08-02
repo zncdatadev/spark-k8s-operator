@@ -27,9 +27,11 @@ import (
 	opgoconfig "github.com/zncdatadev/operator-go/pkg/config"
 	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/sidecar"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -70,6 +72,9 @@ func keycloakAuthClass() *authv1alpha1.AuthenticationClass {
 
 func newScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
+	// corev1 is required beyond the CRDs: the handler creates the oauth2-proxy cookie
+	// Secret and sets an owner reference on it.
+	Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 	Expect(shsv1alpha1.AddToScheme(scheme)).To(Succeed())
 	Expect(s3v1alpha1.AddToScheme(scheme)).To(Succeed())
 	return scheme
@@ -131,13 +136,16 @@ func testBuildContext(cr *shsv1alpha1.SparkHistoryServer) *reconciler.RoleGroupB
 	return &reconciler.RoleGroupBuildContext{
 		ClusterName:      cr.Name,
 		ClusterNamespace: cr.Namespace,
-		ClusterSpec:      cr.GetSpec(),
-		RoleName:         shsv1alpha1.RoleNode,
-		RoleGroupName:    defaultRoleGroup,
-		RoleGroupSpec:    cr.GetSpec().Roles[shsv1alpha1.RoleNode].RoleGroups[defaultRoleGroup],
-		MergedConfig:     &opgoconfig.MergedConfig{},
-		ResourceName:     reconciler.RoleGroupResourceName(cr.Name, shsv1alpha1.RoleNode, defaultRoleGroup),
-		SidecarManager:   sidecar.NewSidecarManager(),
+		// The framework hands the handler a cloned, materialized map (never nil) so a
+		// handler can write to it; mirror that here or the fixture is not the contract.
+		ClusterLabels:  map[string]string{},
+		ClusterSpec:    cr.GetSpec(),
+		RoleName:       shsv1alpha1.RoleNode,
+		RoleGroupName:  defaultRoleGroup,
+		RoleGroupSpec:  cr.GetSpec().Roles[shsv1alpha1.RoleNode].RoleGroups[defaultRoleGroup],
+		MergedConfig:   &opgoconfig.MergedConfig{},
+		ResourceName:   reconciler.RoleGroupResourceName(cr.Name, shsv1alpha1.RoleNode, defaultRoleGroup),
+		SidecarManager: sidecar.NewSidecarManager(),
 	}
 }
 
@@ -220,7 +228,7 @@ var _ = Describe("BuildResources", func() {
 
 		By("keeping the client Service ClusterIP without an OIDC port")
 		Expect(resources.Service.Name).To(Equal("sparkhistory-node-default"))
-		Expect(resources.Service.Spec.Type).To(BeEquivalentTo(""))
+		Expect(resources.Service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
 		for _, p := range resources.Service.Spec.Ports {
 			Expect(p.Name).NotTo(Equal(OidcPortName))
 		}
