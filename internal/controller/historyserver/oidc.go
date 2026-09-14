@@ -21,13 +21,11 @@ import (
 	"fmt"
 
 	authv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/authentication/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"github.com/zncdatadev/operator-go/pkg/sidecar"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	shsv1alpha1 "github.com/zncdatadev/spark-k8s-operator/api/v1alpha1"
 )
@@ -38,10 +36,14 @@ const oidcCookieSecretSuffix = "-oauth2-cookie"
 
 // resolveOIDCProvider fetches the AuthenticationClass referenced by
 // spec.clusterConfig.authentication (from the CR namespace) and asserts it carries an OIDC
-// provider. Returns (nil, nil) when authentication is not configured for OIDC at all.
+// provider. Returns (nil, nil) only when authentication is not configured at all; an explicit
+// authentication block without its OIDC settings fails closed instead of exposing the bare UI.
 func resolveOIDCProvider(ctx context.Context, client ctrlclient.Client, namespace string, auth *shsv1alpha1.AuthenticationSpec) (*authv1alpha1.OIDCProvider, error) {
-	if auth == nil || auth.Oidc == nil {
+	if auth == nil {
 		return nil, nil
+	}
+	if auth.Oidc == nil {
+		return nil, fmt.Errorf("spec.clusterConfig.authentication.oidc is required when authentication is configured")
 	}
 
 	authClass := &authv1alpha1.AuthenticationClass{}
@@ -52,6 +54,14 @@ func resolveOIDCProvider(ctx context.Context, client ctrlclient.Client, namespac
 	provider := authClass.Spec.AuthenticationProvider
 	if provider == nil || provider.OIDC == nil {
 		return nil, fmt.Errorf("AuthenticationClass %q does not define an OIDC provider; the Spark history server supports only OIDC authentication", auth.AuthenticationClass)
+	}
+	if provider.OIDC.TLS != nil {
+		if err := validateWebPKIVerification(
+			provider.OIDC.TLS.Verification,
+			fmt.Sprintf("AuthenticationClass %q OIDC", auth.AuthenticationClass),
+		); err != nil {
+			return nil, err
+		}
 	}
 	return provider.OIDC, nil
 }
@@ -64,61 +74,24 @@ func resolveOIDCProvider(ctx context.Context, client ctrlclient.Client, namespac
 // not a secret.
 func ensureCookieSecret(ctx context.Context, client ctrlclient.Client, cr *shsv1alpha1.SparkHistoryServer, scheme *runtime.Scheme) (*corev1.SecretKeySelector, error) {
 	name := cr.GetName() + oidcCookieSecretSuffix
-	ref := &corev1.SecretKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{Name: name},
-		Key:                  sidecar.OIDCCookieSecretKey,
-	}
-
-	secret := &corev1.Secret{}
-	err := client.Get(ctx, ctrlclient.ObjectKey{Namespace: cr.GetNamespace(), Name: name}, secret)
-	if err == nil {
-		if _, ok := secret.Data[sidecar.OIDCCookieSecretKey]; ok {
-			return ref, nil
-		}
-		// The Secret exists but lost its key (manual edit): restore it without touching
-		// other keys.
-		value, genErr := sidecar.GenerateCookieSecret()
-		if genErr != nil {
-			return nil, genErr
-		}
-		patched := secret.DeepCopy()
-		if patched.Data == nil {
-			patched.Data = map[string][]byte{}
-		}
-		patched.Data[sidecar.OIDCCookieSecretKey] = []byte(value)
-		if err := client.Patch(ctx, patched, ctrlclient.MergeFrom(secret)); err != nil {
-			return nil, fmt.Errorf("failed to restore the cookie secret key on %q: %w", name, err)
-		}
-		return ref, nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get cookie secret %q: %w", name, err)
-	}
-
-	value, err := sidecar.GenerateCookieSecret()
+	_, err := reconciler.EnsureGeneratedSecret(
+		ctx,
+		client,
+		scheme,
+		cr,
+		name,
+		map[string]func() (string, error){
+			sidecar.OIDCCookieSecretKey: sidecar.GenerateCookieSecret,
+		},
+		reconciler.WithGeneratedSecretProductName(shsv1alpha1.DefaultProductName),
+	)
 	if err != nil {
 		return nil, err
 	}
-	secret = &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: cr.GetNamespace(),
-		},
-		Data: map[string][]byte{
-			sidecar.OIDCCookieSecretKey: []byte(value),
-		},
-	}
-	if err := controllerutil.SetControllerReference(cr, secret, scheme); err != nil {
-		return nil, fmt.Errorf("failed to set owner reference on cookie secret %q: %w", name, err)
-	}
-	if err := client.Create(ctx, secret); err != nil {
-		// A concurrent reconcile may have won the race; the next pass reads it.
-		if apierrors.IsAlreadyExists(err) {
-			return ref, nil
-		}
-		return nil, fmt.Errorf("failed to create cookie secret %q: %w", name, err)
-	}
-	return ref, nil
+	return &corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: name},
+		Key:                  sidecar.OIDCCookieSecretKey,
+	}, nil
 }
 
 // registerOIDCSidecar builds the oauth2-proxy sidecar provider from the resolved OIDC

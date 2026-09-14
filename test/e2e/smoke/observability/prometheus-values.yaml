@@ -17,6 +17,10 @@ server:
               regex: (\d+);(.+)
               replacement: $2:$1
               target_label: __address__
+            - source_labels: [__meta_kubernetes_service_name]
+              target_label: service
+            - source_labels: [__meta_kubernetes_namespace]
+              target_label: namespace
 
 # Disable all unnecessary components
 alertmanager:

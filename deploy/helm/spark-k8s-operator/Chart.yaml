@@ -12,6 +12,10 @@ description: The Kubedoop operator for Apache Spark k8s
 # pipeline. Library charts do not define any templates and therefore cannot be deployed.
 type: application
 
+# operator-go v0.13 runs Vector and oauth2-proxy as restartable init containers (native
+# sidecars), which require Kubernetes 1.29 or newer.
+kubeVersion: ">=1.29.0-0"
+
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)

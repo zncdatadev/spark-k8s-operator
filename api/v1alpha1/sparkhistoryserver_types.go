@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/listener"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -84,7 +85,7 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
-	ListenerClass string `json:"listenerClass,omitempty"`
+	ListenerClass listener.ListenerClass `json:"listenerClass,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	VectorAggregatorConfigMapName string `json:"vectorAggregatorConfigMapName,omitempty"`
@@ -94,7 +95,9 @@ type AuthenticationSpec struct {
 	// +kubebuilder:validation:Required
 	AuthenticationClass string `json:"authenticationClass"`
 
-	// +kubebuilder:validation:Optional
+	// Spark History Server supports OIDC authentication only. Requiring this block prevents an
+	// apparently authenticated cluster from silently exposing the unauthenticated HTTP service.
+	// +kubebuilder:validation:Required
 	Oidc *OidcSpec `json:"oidc,omitempty"`
 }
 
@@ -200,6 +203,20 @@ type RoleGroupSpec struct {
 // SparkHistoryServerStatus defines the observed state of SparkHistoryServer
 type SparkHistoryServerStatus struct {
 	commonsv1alpha1.GenericClusterStatus `json:",inline"`
+
+	// Deprecated: retained in the CRD so a rollback to an operator-go v0.12 based
+	// release can still decode status written before this migration.
+	URLs       []StatusURL `json:"urls,omitempty"`
+	Generation int64       `json:"generation,omitempty"`
+	Name       string      `json:"name,omitempty"`
+	Type       string      `json:"type,omitempty"`
+}
+
+// StatusURL is the legacy named URL shape retained for rollback compatibility.
+// The GenericReconciler does not populate it for new clusters.
+type StatusURL struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 // ClusterInterface implementation (client.Object + GetSpec + GetStatus; status is mutated
@@ -239,6 +256,7 @@ func (s *SparkHistoryServerSpec) ToGenericSpec() *commonsv1alpha1.GenericCluster
 			ProductVersion:  s.Image.ProductVersion,
 			KubedoopVersion: s.Image.KubedoopVersion,
 			PullPolicy:      s.Image.PullPolicy,
+			PullSecretName:  s.Image.PullSecretName,
 		}
 	}
 

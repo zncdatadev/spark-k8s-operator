@@ -32,6 +32,14 @@ const (
 	OidcPortName = "oidc"
 	OidcPort     = 4180
 
+	bashPath = "/bin/bash"
+
+	// legacyServiceAccountAnnotation records the workload identity adopted from a v0.12
+	// StatefulSet. Keeping the baseline separate from the live pod template lets a temporary
+	// v0.13 podOverride be removed without accidentally making that override permanent.
+	legacyServiceAccountAnnotation = "spark.kubedoop.dev/legacy-service-account"
+	defaultServiceAccountName      = "default"
+
 	// SparkDefaultsFileName is the properties file the history server is started with.
 	SparkDefaultsFileName = "spark-defaults.conf"
 

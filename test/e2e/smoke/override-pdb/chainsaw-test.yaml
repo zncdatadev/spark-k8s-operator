@@ -65,6 +65,9 @@ spec:
           value: ($namespace)
         content: |
           #!/bin/bash
-          kubectl -n $NAMESPACE get sts test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "COMMON_VAR" and .value == "group-value")'
-          kubectl -n $NAMESPACE get sts test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "GROUP_VAR" and .value == "group-value")'
-          kubectl -n $NAMESPACE get sts test-sparkhistoryserver-node-default -o yaml | yq -e '.spec.template.spec.containers[] | select (.name == "node") | .env[] | select (.name == "ROLE_VAR" and .value == "role-value")'
+          set -eu
+          ENVS=$(kubectl -n "$NAMESPACE" get sts test-sparkhistoryserver-node-default \
+            -o go-template='{{range .spec.template.spec.containers}}{{if eq .name "node"}}{{range .env}}{{printf "%s=%s\n" .name .value}}{{end}}{{end}}{{end}}')
+          printf '%s\n' "$ENVS" | grep -Fx 'COMMON_VAR=group-value'
+          printf '%s\n' "$ENVS" | grep -Fx 'GROUP_VAR=group-value'
+          printf '%s\n' "$ENVS" | grep -Fx 'ROLE_VAR=role-value'
