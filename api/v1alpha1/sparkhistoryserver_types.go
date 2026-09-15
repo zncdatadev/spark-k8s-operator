@@ -19,7 +19,7 @@ package v1alpha1
 import (
 	commonsv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/commons/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
-	"github.com/zncdatadev/operator-go/pkg/status"
+	"github.com/zncdatadev/operator-go/pkg/listener"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,6 +28,10 @@ const (
 	DefaultRepository     = "quay.io/zncdatadev"
 	DefaultProductVersion = "3.5.5"
 	DefaultProductName    = "spark-k8s"
+
+	// RoleNode is the sole role of the Spark history server cluster. The name is contract:
+	// it is the workload container name and the "-node-" segment of every resource name.
+	RoleNode = "node"
 )
 
 // https://book.kubebuilder.io/reference/generating-crd
@@ -40,8 +44,8 @@ type SparkHistoryServer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SparkHistoryServerSpec `json:"spec,omitempty"`
-	Status status.Status          `json:"status,omitempty"`
+	Spec   SparkHistoryServerSpec   `json:"spec,omitempty"`
+	Status SparkHistoryServerStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -81,7 +85,7 @@ type ClusterConfigSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default:=cluster-internal
 	// +kubebuilder:validation:Enum=cluster-internal;external-unstable;external-stable
-	ListenerClass string `json:"listenerClass,omitempty"`
+	ListenerClass listener.ListenerClass `json:"listenerClass,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	VectorAggregatorConfigMapName string `json:"vectorAggregatorConfigMapName,omitempty"`
@@ -91,7 +95,9 @@ type AuthenticationSpec struct {
 	// +kubebuilder:validation:Required
 	AuthenticationClass string `json:"authenticationClass"`
 
-	// +kubebuilder:validation:Optional
+	// Spark History Server supports OIDC authentication only. Requiring this block prevents an
+	// apparently authenticated cluster from silently exposing the unauthenticated HTTP service.
+	// +kubebuilder:validation:Required
 	Oidc *OidcSpec `json:"oidc,omitempty"`
 }
 
@@ -157,6 +163,19 @@ type RoleSpec struct {
 	// +kubebuilder:validation:Optional
 	Config *ConfigSpec `json:"config,omitempty"`
 
+	// RoleGroups defines the role group configurations. Each role group maps to one
+	// StatefulSet.
+	//
+	// The name constraint mirrors commons.RoleSpec.RoleGroups, which this typed field
+	// replaces and whose CEL guard therefore does not reach this CRD: a role group name is a
+	// segment of "<cluster>-node-<group>" and the value of the app.kubernetes.io/role-group
+	// label, so a name that is not a lowercase RFC 1123 label yields resource names the API
+	// server refuses — mid-reconcile, instead of at apply. MaxProperties bounds the CEL cost
+	// estimate, not the deployment.
+	//
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:MaxProperties=256
+	// +kubebuilder:validation:XValidation:rule=`self.all(k, size(k) <= 63 && k.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))`,message=`each role group name must be a lowercase RFC 1123 label (lowercase alphanumerics and '-', starting and ending with an alphanumeric, at most 63 characters): role group names become part of the name and labels of every resource built for the group`
 	RoleGroups map[string]*RoleGroupSpec `json:"roleGroups,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -181,7 +200,119 @@ type RoleGroupSpec struct {
 	Config *ConfigSpec `json:"config,omitempty"`
 }
 
-type PodOverridesSpec struct {
+// SparkHistoryServerStatus defines the observed state of SparkHistoryServer
+type SparkHistoryServerStatus struct {
+	commonsv1alpha1.GenericClusterStatus `json:",inline"`
+
+	// Deprecated: retained in the CRD so a rollback to an operator-go v0.12 based
+	// release can still decode status written before this migration.
+	URLs       []StatusURL `json:"urls,omitempty"`
+	Generation int64       `json:"generation,omitempty"`
+	Name       string      `json:"name,omitempty"`
+	Type       string      `json:"type,omitempty"`
+}
+
+// StatusURL is the legacy named URL shape retained for rollback compatibility.
+// The GenericReconciler does not populate it for new clusters.
+type StatusURL struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+// ClusterInterface implementation (client.Object + GetSpec + GetStatus; status is mutated
+// through the pointer GetStatus returns)
+
+// GetSpec adapts the product spec to the framework's generic cluster spec.
+func (s *SparkHistoryServer) GetSpec() *commonsv1alpha1.GenericClusterSpec {
+	return s.Spec.ToGenericSpec()
+}
+
+// GetStatus returns the cluster status.
+func (s *SparkHistoryServer) GetStatus() *commonsv1alpha1.GenericClusterStatus {
+	return &s.Status.GenericClusterStatus
+}
+
+// VectorAggregatorConfigMapName implements reconciler.VectorAggregatorProvider so the framework
+// owns vector.yaml generation: when a role group enables the Vector agent, the GenericReconciler
+// resolves the aggregator address from this ConfigMap and renders vector.yaml into the role group
+// ConfigMap. Returns "" when unset (the framework then omits vector.yaml).
+func (s *SparkHistoryServer) VectorAggregatorConfigMapName() string {
+	if s.Spec.ClusterConfig == nil {
+		return ""
+	}
+	return s.Spec.ClusterConfig.VectorAggregatorConfigMapName
+}
+
+// ToGenericSpec adapts SparkHistoryServerSpec to GenericClusterSpec.
+func (s *SparkHistoryServerSpec) ToGenericSpec() *commonsv1alpha1.GenericClusterSpec {
+	result := &commonsv1alpha1.GenericClusterSpec{
+		ClusterOperation: s.ClusterOperation,
+	}
+
+	if s.Image != nil {
+		result.Image = &commonsv1alpha1.ImageSpec{
+			Custom:          s.Image.Custom,
+			Repo:            s.Image.Repo,
+			ProductVersion:  s.Image.ProductVersion,
+			KubedoopVersion: s.Image.KubedoopVersion,
+			PullPolicy:      s.Image.PullPolicy,
+			PullSecretName:  s.Image.PullSecretName,
+		}
+	}
+
+	if s.Node != nil {
+		result.Roles = map[string]commonsv1alpha1.RoleSpec{
+			RoleNode: s.Node.toGenericRole(),
+		}
+	}
+
+	return result
+}
+
+// toGenericRole adapts the typed node role to the commons role spec.
+func (r *RoleSpec) toGenericRole() commonsv1alpha1.RoleSpec {
+	roleSpec := commonsv1alpha1.RoleSpec{
+		RoleConfig: r.RoleConfig,
+	}
+
+	if r.Config != nil {
+		roleSpec.Config = r.Config.RoleGroupConfigSpec
+	}
+
+	if r.OverridesSpec != nil {
+		roleSpec.ConfigOverrides = r.ConfigOverrides
+		roleSpec.EnvOverrides = r.EnvOverrides
+		roleSpec.CliOverrides = r.CliOverrides
+		roleSpec.PodOverrides = r.PodOverrides
+	}
+
+	roleGroups := make(map[string]commonsv1alpha1.RoleGroupSpec)
+	for name, rg := range r.RoleGroups {
+		if rg == nil {
+			continue
+		}
+		roleGroups[name] = rg.toGenericRoleGroup()
+	}
+	roleSpec.RoleGroups = roleGroups
+
+	return roleSpec
+}
+
+// toGenericRoleGroup adapts a typed role group to the commons role group spec.
+func (rg *RoleGroupSpec) toGenericRoleGroup() commonsv1alpha1.RoleGroupSpec {
+	adapted := commonsv1alpha1.RoleGroupSpec{
+		Replicas: rg.Replicas,
+	}
+	if rg.Config != nil {
+		adapted.Config = rg.Config.RoleGroupConfigSpec
+	}
+	if rg.OverridesSpec != nil {
+		adapted.ConfigOverrides = rg.ConfigOverrides
+		adapted.EnvOverrides = rg.EnvOverrides
+		adapted.CliOverrides = rg.CliOverrides
+		adapted.PodOverrides = rg.PodOverrides
+	}
+	return adapted
 }
 
 func init() {

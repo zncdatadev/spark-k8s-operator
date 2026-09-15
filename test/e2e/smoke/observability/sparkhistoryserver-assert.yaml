@@ -14,7 +14,7 @@ spec:
     - name: http
       port: 18081
       protocol: TCP
-      targetPort: http
+      targetPort: metrics
   selector:
     app.kubernetes.io/instance: test-spark-observability
     app.kubernetes.io/component: node

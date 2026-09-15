@@ -1,5 +1,7 @@
 # VERSION refers to the application version.
 VERSION ?= 0.0.0-dev
+# PRODUCT_VERSION is the Spark version exercised by local and CI acceptance tests.
+PRODUCT_VERSION ?= 3.5.5
 
 # REGISTRY refers to the container registry where the image will be pushed.
 REGISTRY ?= quay.io/zncdatadev
@@ -299,7 +301,11 @@ CHAINSAW_KUBECONFIG ?= .kubeconfig
 # When run `kind create --image kindest/node:v${KIND_K8S_VERSION}`, the node image version of k8s will be used to create the kind cluster,
 # and the target kubeconfig file will be named as `$(CHAINSAW_KUBECONFIG)` (default: `.kubeconfig`).
 # So if you want to use the target cluster, run `export KUBECONFIG=$(CHAINSAW_KUBECONFIG)` (default: `.kubeconfig`).
-KIND_K8S_VERSION ?= 1.26.15
+# Kubernetes >= 1.29 is required: the operator-go framework injects long-running sidecars
+# (Vector, oauth2-proxy) as native sidecars (restartable init containers). On older servers
+# the restartPolicy field is silently dropped and pod creation is rejected. Matches the CI
+# matrix (.github/workflows/test.yml).
+KIND_K8S_VERSION ?= 1.35.0
 # The kind node image can found in https://github.com/kubernetes-sigs/kind/releases.
 KIND_IMAGE ?= kindest/node:v${KIND_K8S_VERSION}
 # Define operator dependencies to be installed before running chainsaw tests.
@@ -317,13 +323,12 @@ setup-chainsaw-cluster: ## Set up a Kind cluster for e2e tests if it does not ex
 		echo "Kind is not installed. Please install Kind manually. You can run `go install sigs.k8s.io/kind@v0.31.0`"; \
 		exit 1; \
 	}
-	@case "$$($(KIND) get clusters)" in \
-		*"$(CHAINSAW_CLUSTER)"*) \
-			echo "Kind cluster '$(CHAINSAW_CLUSTER)' already exists. Skipping creation." ;; \
-		*) \
-			echo "Creating Kind cluster '$(CHAINSAW_CLUSTER)'..."; \
-			$(KIND) create cluster --name $(CHAINSAW_CLUSTER) --image $(KIND_IMAGE) --kubeconfig $(CHAINSAW_KUBECONFIG) ;; \
-	esac
+	@if "$(KIND)" get clusters | grep -Fxq "$(CHAINSAW_CLUSTER)"; then \
+		echo "Kind cluster '$(CHAINSAW_CLUSTER)' already exists. Skipping creation."; \
+	else \
+		echo "Creating Kind cluster '$(CHAINSAW_CLUSTER)'..."; \
+		"$(KIND)" create cluster --name "$(CHAINSAW_CLUSTER)" --image "$(KIND_IMAGE)" --kubeconfig "$(CHAINSAW_KUBECONFIG)"; \
+	fi
 
 	@if [ -n "$(strip $(OPERATOR_DEPENDS))" ]; then \
 		echo "Installing operator dependencies..."; \
@@ -349,7 +354,27 @@ chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package ## Ru
 	@echo "Installing spark-k8s-operator chart..."
 	"$(HELM)" upgrade --install --create-namespace --namespace spark-k8s-operator --kubeconfig $(CHAINSAW_KUBECONFIG) --wait spark-k8s-operator ./target/charts/spark-k8s-operator-$(VERSION).tgz
 	@echo "Running chainsaw e2e tests..."
-	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/
+	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --set product_version=$(PRODUCT_VERSION)
+
+# Pin the last operator-go v0.12 release baseline. A SHA keeps a future upstream/main
+# movement from silently changing the migration contract.
+UPGRADE_BASELINE_REF ?= 42f080c1cb6466ce3441c47284994991e881b7c4
+UPGRADE_CLUSTER ?= framework-upgrade-spark-k8s-operator
+UPGRADE_K8S_VERSION ?= $(KIND_K8S_VERSION)
+UPGRADE_EVIDENCE_DIR ?= $(CURDIR)/target/framework-upgrade-evidence
+
+.PHONY: framework-upgrade-e2e
+framework-upgrade-e2e: kustomize ## Verify v0.12 -> v0.13 -> v0.12 in place, including Spark event-history continuity.
+	KIND="$(KIND)" HELM="$(HELM)" CONTAINER_TOOL="$(CONTAINER_TOOL)" \
+		OPERATOR_DEPENDS="$(OPERATOR_DEPENDS)" DEPENDENCY_CHART_VERSION="$(VERSION)" \
+		UPGRADE_BASELINE_REF="$(UPGRADE_BASELINE_REF)" UPGRADE_CLUSTER="$(UPGRADE_CLUSTER)" \
+		UPGRADE_K8S_VERSION="$(UPGRADE_K8S_VERSION)" UPGRADE_EVIDENCE_DIR="$(UPGRADE_EVIDENCE_DIR)" \
+		KUSTOMIZE="$(abspath $(KUSTOMIZE))" PRODUCT_VERSION="$(PRODUCT_VERSION)" \
+		bash hack/run-framework-upgrade.sh
+
+.PHONY: cleanup-framework-upgrade-e2e
+cleanup-framework-upgrade-e2e: ## Delete only the dedicated framework-upgrade kind cluster.
+	"$(KIND)" delete cluster --name "$(UPGRADE_CLUSTER)"
 
 .PHONY: cleanup-chainsaw-e2e
 cleanup-chainsaw-e2e: ## Run the chainsaw cleanup

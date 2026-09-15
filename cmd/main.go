@@ -28,6 +28,8 @@ import (
 
 	authv1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/authentication/v1alpha1"
 	s3v1alpha1 "github.com/zncdatadev/operator-go/pkg/apis/s3/v1alpha1"
+	"github.com/zncdatadev/operator-go/pkg/common"
+	"github.com/zncdatadev/operator-go/pkg/reconciler"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -193,10 +195,34 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&historyserver.SparkHistoryServerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	sparkHandler := historyserver.NewSparkHistoryRoleGroupHandler(mgr.GetScheme())
+	extensionRegistry := common.NewExtensionRegistry[*sparkv1alpha1.SparkHistoryServer]()
+	extensionRegistry.RegisterClusterExtension(historyserver.NewLegacyCompatibilityExtension())
+	sparkReconciler, err := reconciler.NewGenericReconciler(
+		&reconciler.GenericReconcilerConfig[*sparkv1alpha1.SparkHistoryServer]{
+			Client:    mgr.GetClient(),
+			APIReader: mgr.GetAPIReader(),
+			Scheme:    mgr.GetScheme(),
+			//nolint:staticcheck // TODO: migrate to GetEventRecorder once the SDK supports it
+			Recorder:          mgr.GetEventRecorderFor("sparkhistoryserver-controller"),
+			RoleGroupHandler:  sparkHandler,
+			RoleProvider:      sparkHandler,
+			RoleGroupResolver: sparkHandler,
+			ExtensionRegistry: extensionRegistry,
+			ImageResolution: reconciler.ImageResolution{
+				ProductName: sparkv1alpha1.DefaultProductName,
+				Defaults:    historyserver.ImageDefaults(),
+			},
+			// WorkloadRBACRules is intentionally unset: Spark History Server does not call
+			// the Kubernetes API. The framework still creates and binds the derived
+			// ServiceAccount ("sparkhistoryserver-<cluster>").
+			Prototype: &sparkv1alpha1.SparkHistoryServer{},
+		})
+	if err != nil {
+		setupLog.Error(err, "unable to create reconciler", "controller", "SparkHistoryServer")
+		os.Exit(1)
+	}
+	if err = sparkReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "SparkHistoryServer")
 		os.Exit(1)
 	}
