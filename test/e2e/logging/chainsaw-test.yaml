@@ -22,6 +22,15 @@ spec:
         file: ../setup/minio.yaml
     - assert:
         file: ../setup/minio-assert.yaml
+        timeout: 300s
+    catch:
+    - script:
+        env:
+          - name: NAMESPACE
+            value: ($namespace)
+        content: |
+          kubectl -n "$NAMESPACE" get pods,statefulsets,pvc -o wide
+          kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp
   - name: install vector-aggregator
     try:
     - script:
