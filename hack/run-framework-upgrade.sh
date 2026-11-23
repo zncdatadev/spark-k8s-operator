@@ -293,6 +293,7 @@ frozen_files+=("dependency-charts/vector-$vector_chart_version.tgz")
 run_token=$(date -u +%Y%m%dT%H%M%SZ)-$$
 baseline_image=${UPGRADE_BASELINE_IMAGE:-spark-k8s-operator:framework-upgrade-v012-${baseline_commit:0:12}-$run_token}
 framework_image=${UPGRADE_FRAMEWORK_IMAGE:-spark-k8s-operator:framework-upgrade-v013-${current_short}-$run_token}
+minio_image=kubedoop/spark-minio-e2e:RELEASE.2025-07-23T15-54-02Z
 kind_image="kindest/node:v${k8s_version#v}"
 
 {
@@ -313,6 +314,7 @@ kind_image="kindest/node:v${k8s_version#v}"
     printf 'vector_chart_repo=%s\n' "$vector_chart_repo"
     printf 'baseline_image=%s\n' "$baseline_image"
     printf 'framework_image=%s\n' "$framework_image"
+    printf 'minio_image=%s\n' "$minio_image"
 } > "$run_dir/run-metadata.env"
 git -C "$candidate_dir" status --short --untracked-files=all > "$run_dir/candidate-worktree-status.txt"
 git -C "$candidate_dir" show --no-ext-diff --stat --oneline HEAD > "$run_dir/candidate-commit.txt"
@@ -339,6 +341,11 @@ make -C "$candidate_dir" docker-build \
     IMG="$framework_image" CONTAINER_TOOL="$container_tool" \
     2>&1 | tee "$run_dir/framework-image-build.log"
 
+echo "Building pinned MinIO test fixture from official source: $minio_image"
+make -C "$candidate_dir" e2e-minio-image \
+    E2E_MINIO_IMAGE="$minio_image" CONTAINER_TOOL="$container_tool" \
+    2>&1 | tee "$run_dir/minio-image-build.log"
+
 test "$(git -C "$baseline_dir" rev-parse HEAD)" = "$baseline_commit"
 test "$(git -C "$candidate_dir" rev-parse HEAD)" = "$current_head"
 git -C "$baseline_dir" status --short --untracked-files=all > "$run_dir/baseline-post-build-status.txt"
@@ -348,9 +355,11 @@ test ! -s "$run_dir/candidate-post-build-status.txt"
 
 baseline_image_id=$("$container_tool" image inspect --format '{{.Id}}' "$baseline_image")
 framework_image_id=$("$container_tool" image inspect --format '{{.Id}}' "$framework_image")
+minio_image_id=$("$container_tool" image inspect --format '{{.Id}}' "$minio_image")
 {
     printf 'baseline_image_id=%s\n' "$baseline_image_id"
     printf 'framework_image_id=%s\n' "$framework_image_id"
+    printf 'minio_image_id=%s\n' "$minio_image_id"
 } | tee -a "$run_dir/run-metadata.env" > "$run_dir/image-ids.env"
 
 echo "Creating dedicated kind cluster: $cluster"
@@ -359,6 +368,9 @@ echo "Creating dedicated kind cluster: $cluster"
     --image "$kind_image" \
     --kubeconfig "$kubeconfig" \
     2>&1 | tee "$run_dir/cluster-create.log"
+
+"$kind" load docker-image --name "$cluster" "$minio_image" \
+    2>&1 | tee "$run_dir/minio-image-load.log"
 
 for dependency in $operator_depends; do
     echo "Installing frozen dependency chart: $dependency"

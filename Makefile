@@ -296,6 +296,7 @@ CHAINSAW ?= $(LOCALBIN)/chainsaw
 CHAINSAW_VERSION ?= v0.2.14
 CHAINSAW_CLUSTER ?= chainsaw-${PROJECT_NAME}
 CHAINSAW_KUBECONFIG ?= .kubeconfig
+E2E_MINIO_IMAGE ?= kubedoop/spark-minio-e2e:RELEASE.2025-07-23T15-54-02Z
 # KIND_K8S_VERSION refers to the version of Kubernetes to be used by kind node image.
 # The version only effects e2e tests.
 # When run `kind create --image kindest/node:v${KIND_K8S_VERSION}`, the node image version of k8s will be used to create the kind cluster,
@@ -338,9 +339,14 @@ setup-chainsaw-cluster: ## Set up a Kind cluster for e2e tests if it does not ex
 		done; \
 	fi
 
+.PHONY: e2e-minio-image
+e2e-minio-image: ## Build the pinned MinIO server/client fixture from official source.
+	$(CONTAINER_TOOL) build -t "$(E2E_MINIO_IMAGE)" -f test/e2e/setup/minio.Dockerfile test/e2e/setup
+
 .PHONY: setup-chainsaw-e2e
-setup-chainsaw-e2e: chainsaw docker-build ## Run the chainsaw setup
+setup-chainsaw-e2e: chainsaw docker-build e2e-minio-image ## Run the chainsaw setup
 	"$(KIND)" --name $(CHAINSAW_CLUSTER) load docker-image "$(IMG)"
+	"$(KIND)" --name $(CHAINSAW_CLUSTER) load docker-image "$(E2E_MINIO_IMAGE)"
 	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(MAKE) deploy
 
 
@@ -349,8 +355,9 @@ chainsaw-e2e: ## Run the chainsaw e2e tests
 	KUBECONFIG=$(CHAINSAW_KUBECONFIG) $(CHAINSAW) test --config ./test/e2e/.chainsaw.yaml --test-dir ./test/e2e/ --set product_version=$(PRODUCT_VERSION)
 
 .PHONY: chart-e2e
-chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package ## Run chart e2e tests (deploy via Helm, then run chainsaw)
+chart-e2e: setup-chainsaw-cluster chainsaw docker-build helm-chart-package e2e-minio-image ## Run chart e2e tests (deploy via Helm, then run chainsaw)
 	"$(KIND)" --name $(CHAINSAW_CLUSTER) load docker-image "$(IMG)"
+	"$(KIND)" --name $(CHAINSAW_CLUSTER) load docker-image "$(E2E_MINIO_IMAGE)"
 	@echo "Installing spark-k8s-operator chart..."
 	"$(HELM)" upgrade --install --create-namespace --namespace spark-k8s-operator --kubeconfig $(CHAINSAW_KUBECONFIG) --wait spark-k8s-operator ./target/charts/spark-k8s-operator-$(VERSION).tgz
 	@echo "Running chainsaw e2e tests..."
