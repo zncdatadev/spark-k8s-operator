@@ -5,12 +5,13 @@ metadata:
   name: {{ include "operator.fullname" . }}
   labels:
     {{- include "operator.labels" . | nindent 4 }}
+# Keep this hand-maintained template in step with config/rbac/role.yaml, which
+# is generated from the markers in internal/controller/historyserver/rbac.go.
 rules:
 - apiGroups:
   - ""
   resources:
   - configmaps
-  - secrets
   - services
   verbs:
   - create
@@ -23,10 +24,48 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - pods
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - apps
@@ -74,12 +113,8 @@ rules:
   resources:
   - sparkhistoryservers
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - spark.kubedoop.dev

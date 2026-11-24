@@ -26,6 +26,11 @@ spec:
           value: admin
         - name: KEYCLOAK_ADMIN_PASSWORD
           value: admin
+        # The Keycloak 25 default derives a 70% maximum heap from the 1Gi
+        # container limit, leaving too little native-memory headroom on a
+        # single-node kind cluster before the OIDC test starts.
+        - name: JAVA_OPTS_KC_HEAP
+          value: -Xms64m -Xmx512m
         resources:
           limits:
             memory: "1Gi"

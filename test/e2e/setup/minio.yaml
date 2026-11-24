@@ -83,7 +83,8 @@ spec:
     spec:
       containers:
       - name: minio
-        image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+        image: kubedoop/spark-minio-e2e:RELEASE.2025-07-23T15-54-02Z
+        imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
             name: minio-admin-credentials
@@ -150,7 +151,8 @@ spec:
           mountPath: /data
       containers:
       - name: minio-init
-        image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+        image: kubedoop/spark-minio-e2e:RELEASE.2025-07-23T15-54-02Z
+        imagePullPolicy: IfNotPresent
         envFrom:
         - secretRef:
             name: spark-minio-credentials

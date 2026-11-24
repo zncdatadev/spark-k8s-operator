@@ -29,6 +29,10 @@ helm install secret-operator oci://quay.io/kubedoopcharts/secret-operator
 helm install spark-k8s-operator oci://quay.io/kubedoopcharts/spark-k8s-operator
 ```
 
+Existing installations moving from the operator-go v0.12 controller must
+follow the [operator-go v0.13 migration guide](docs/operator-go-v0.13-migration.md),
+including the explicit CRD upgrade before `helm upgrade`.
+
 ### Deploy spark-k8s cluster
 
 ```bash
